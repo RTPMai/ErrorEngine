@@ -213,9 +213,9 @@
             <div class="combo-list" id="customer-list"></div>
           </div>
         </div>
-        <div class="field">
-          <label>Owner (AM / CSR / Vendor)</label>
-          <input name="owner" placeholder="e.g. J. Smith" />
+        <div class="field" id="vendor-field" style="display:none">
+          <label>Vendor <span class="req">*</span></label>
+          <input name="owner" id="f-owner" placeholder="Vendor name (e.g. SanMar, S&S)" />
         </div>
         <div class="field">
           <label>Status <span class="req">*</span></label>
@@ -284,6 +284,20 @@ function fillSelect(id, opts) {
 fillSelect('f-type', ERROR_TYPES);
 fillSelect('f-cause', ROOT_CAUSES);
 fillSelect('f-status', STATUSES);
+
+// Owner field is vendor-only: show it (required) just for "vendor defect".
+// For all other error types the accountable AM/CSR comes from BackBone automatically.
+function updateVendorField() {
+  const type = document.getElementById('f-type').value;
+  const isVendor = type === 'vendor defect';
+  const field = document.getElementById('vendor-field');
+  const input = document.getElementById('f-owner');
+  field.style.display = isVendor ? 'flex' : 'none';
+  input.required = isVendor;
+  if (!isVendor) input.value = ''; // don't submit a stale vendor name
+}
+document.getElementById('f-type').addEventListener('change', updateVendorField);
+updateVendorField();
 
 // Load BackBone customers (read-only) and wire the searchable typeahead.
 let CUSTOMERS = [];
