@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ErrorEngine — Sign in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #F4F6F8; --green: #3D9A5C; --purple: #7B5EA7; --purple-deep: #5E4585;
+    --ink: #1C2430; --muted: #6B7684; --card: #FFFFFF; --line: #E4E8EC;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; display: grid; place-items: center; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 34px 32px; width: 100%; max-width: 380px; }
+  .brand { display: flex; align-items: center; gap: 12px; justify-content: center; margin-bottom: 6px; }
+  .mark { width: 40px; height: 40px; border-radius: 50%; background: var(--purple); display: grid; place-items: center; }
+  .mark svg { width: 24px; height: 24px; }
+  .name { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .name .a { color: var(--purple); } .name .b { color: var(--ink); } .name .d { color: var(--green); }
+  .sub { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; }
+  input { width: 100%; font-family: inherit; font-size: 14px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 16px; }
+  input:focus { outline: 2px solid var(--purple); border-color: var(--purple); }
+  button { width: 100%; background: var(--purple); color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; }
+  button:hover { background: var(--purple-deep); }
+  .msg { font-size: 13px; font-weight: 600; margin-top: 14px; text-align: center; min-height: 18px; }
+  .msg.err { color: #C0392B; } .msg.ok { color: var(--green); }
+  .note { font-size: 12px; color: var(--muted); text-align: center; margin-top: 18px; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M12 6v7" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="17" r="1.6" fill="#3D9A5C"/></svg></div>
+      <div class="name"><span class="a">Error</span><span class="b">Engine</span><span class="d">.</span></div>
+    </div>
+    <p class="sub" id="sub">Sign in to continue</p>
+
+    <label id="name-label" style="display:none">Your name</label>
+    <input id="fullname" placeholder="e.g. Jordan Smith" style="display:none" />
+
+    <label>Username</label>
+    <input id="username" autocomplete="username" />
+
+    <label>Password</label>
+    <input id="password" type="password" autocomplete="current-password" />
+
+    <button id="submit">Sign in</button>
+    <div class="msg" id="msg"></div>
+    <p class="note" id="note"></p>
+  </div>
+
+<script>
+let MODE = 'login'; // or 'bootstrap'
+
+async function detectMode() {
+  // If no users exist yet, the auth route's bootstrap is available: show first-admin setup.
+  try {
+    const r = await fetch('/api/auth?action=me');
+    // Probe bootstrap by attempting a harmless check: we ask the server via a dedicated flag.
+    const probe = await fetch('/api/auth', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ action: 'bootstrap' }) // missing fields -> 400 if allowed, 403 if users exist
+    });
+    if (probe.status === 400) { // bootstrap allowed (empty store), just missing fields
+      MODE = 'bootstrap';
+      document.getElementById('sub').textContent = 'Create the first admin account';
+      document.getElementById('name-label').style.display = 'block';
+      document.getElementById('fullname').style.display = 'block';
+      document.getElementById('submit').textContent = 'Create admin';
+      document.getElementById('note').textContent = 'No users exist yet. This first account becomes the administrator.';
+    }
+  } catch (e) { /* default to login */ }
+}
+
+async function submit() {
+  const msg = document.getElementById('msg');
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const name = document.getElementById('fullname').value.trim();
+  msg.textContent = '';
+
+  const payload = MODE === 'bootstrap'
+    ? { action: 'bootstrap', username, password, name }
+    : { action: 'login', username, password };
+
+  try {
+    const r = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) { msg.className='msg err'; msg.textContent = j.error || ('Error '+r.status); return; }
+    msg.className='msg ok'; msg.textContent = 'Success — redirecting…';
+    window.location.href = '/';
+  } catch (e) { msg.className='msg err'; msg.textContent = e.message; }
+}
+
+document.getElementById('submit').addEventListener('click', submit);
+document.getElementById('password').addEventListener('keydown', e => { if (e.key==='Enter') submit(); });
+
+detectMode();
+</script>
+</body>
+</html>
