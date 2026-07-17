@@ -126,6 +126,7 @@
       </svg>
     </div>
     <div class="brand"><span class="err">Error</span><span class="eng">Engine</span><span class="dot">.</span></div>
+    <a href="#" id="logout" style="margin-left:auto;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none">Sign out</a>
   </header>
   <p class="tagline">Tracks errors, replacements, misprints, and issues to drive accountability and continuous improvement.</p>
 
@@ -360,7 +361,25 @@ document.getElementById('error-form').addEventListener('submit', async (ev) => {
   }
 });
 
+document.getElementById('logout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'logout'}) });
+  window.location.href = '/login.html';
+});
+
+// Gate the whole app on a valid session. If not signed in, go to login.
+async function ensureAuth() {
+  try {
+    const r = await fetch('/api/auth?action=me');
+    const j = await r.json();
+    if (!j.authenticated) { window.location.href = '/login.html'; return null; }
+    return j.user;
+  } catch (e) { window.location.href = '/login.html'; return null; }
+}
+
 (async () => {
+  const user = await ensureAuth();
+  if (!user) return; // redirecting
   await probe();
   await loadCustomers();
   await render();
