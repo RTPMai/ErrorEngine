@@ -23,7 +23,13 @@ export default async function handler(req, res) {
     // ---- who am I ----
     if (action === "me" || req.method === "GET") {
       const sess = getSession(req);
-      if (!sess) return res.status(200).json({ authenticated: false });
+      if (!sess) {
+        // needsSetup tells the login page whether to show "create first admin"
+        // vs "sign in" — a deterministic check, not a fragile probe.
+        let needsSetup = false;
+        try { needsSetup = await noUsersYet(); } catch (e) { needsSetup = false; }
+        return res.status(200).json({ authenticated: false, needsSetup });
+      }
       return res.status(200).json({
         authenticated: true,
         user: { username: sess.username, name: sess.name, role: sess.role },
