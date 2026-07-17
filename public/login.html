@@ -56,15 +56,12 @@
 let MODE = 'login'; // or 'bootstrap'
 
 async function detectMode() {
-  // If no users exist yet, the auth route's bootstrap is available: show first-admin setup.
+  // Deterministic: the server tells us whether the user store is empty.
   try {
     const r = await fetch('/api/auth?action=me');
-    // Probe bootstrap by attempting a harmless check: we ask the server via a dedicated flag.
-    const probe = await fetch('/api/auth', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ action: 'bootstrap' }) // missing fields -> 400 if allowed, 403 if users exist
-    });
-    if (probe.status === 400) { // bootstrap allowed (empty store), just missing fields
+    const j = await r.json();
+    if (j.authenticated) { window.location.href = '/'; return; } // already signed in
+    if (j.needsSetup) {
       MODE = 'bootstrap';
       document.getElementById('sub').textContent = 'Create the first admin account';
       document.getElementById('name-label').style.display = 'block';
