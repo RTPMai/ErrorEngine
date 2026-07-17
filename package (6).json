@@ -1,0 +1,10 @@
+{
+  "name": "errorengine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Quality/accountability layer for P&M Apparel — logs and analyzes production errors. Reuses BackBone conventions; reads backbone_data read-only.",
+  "engines": {
+    "node": ">=18"
+  }
+}
