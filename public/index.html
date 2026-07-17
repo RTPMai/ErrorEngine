@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ErrorEngine — P&M Apparel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #F4F6F8;
+    --green: #3D9A5C;
+    --purple: #7B5EA7;
+    --purple-deep: #5E4585;
+    --ink: #1C2430;
+    --muted: #6B7684;
+    --card: #FFFFFF;
+    --line: #E4E8EC;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  /* Header / brand */
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .mark {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--purple); display: grid; place-items: center; flex: none;
+  }
+  .mark svg { width: 26px; height: 26px; }
+  .brand { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+  .brand .err { color: var(--purple); }
+  .brand .eng { color: var(--ink); }
+  .brand .dot { color: var(--green); }
+  .tagline { color: var(--muted); font-size: 14px; margin: 2px 0 28px 58px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
+  .tab {
+    padding: 10px 18px; font-size: 14px; font-weight: 600; color: var(--muted);
+    background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .tab.active { color: var(--purple); border-bottom-color: var(--purple); }
+
+  /* Cards */
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .stat .label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat .value { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin-top: 6px; }
+  .stat .value.green { color: var(--green); }
+  .stat .value.purple { color: var(--purple); }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px 24px; margin-bottom: 20px;
+  }
+  .panel h2 { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+
+  /* Breakdown bars */
+  .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; font-size: 13px; }
+  .bar-row .k { width: 150px; color: var(--muted); flex: none; }
+  .bar-track { flex: 1; height: 8px; background: var(--bg); border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--purple); border-radius: 5px; }
+  .bar-row .v { width: 34px; text-align: right; font-weight: 600; flex: none; }
+
+  /* Form */
+  form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.full { grid-column: 1 / -1; }
+  label { font-size: 13px; font-weight: 600; }
+  label .req { color: var(--purple); }
+  input, select, textarea {
+    font-family: inherit; font-size: 14px; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--purple); border-color: var(--purple); }
+  textarea { resize: vertical; min-height: 76px; }
+  .actions { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; }
+  button.primary {
+    background: var(--purple); color: #fff; border: none; padding: 11px 22px;
+    border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  button.primary:hover { background: var(--purple-deep); }
+  .msg { font-size: 13px; font-weight: 600; }
+  .msg.ok { color: var(--green); }
+  .msg.err { color: #C0392B; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+  td { padding: 11px 10px; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .pill.open { background: #FDECEA; color: #C0392B; }
+  .pill.review { background: #FEF6E0; color: #A67C00; }
+  .pill.resolved { background: #E7F5EC; color: var(--green); }
+  .pill.written { background: #EEE9F5; color: var(--purple-deep); }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; }
+  .hidden { display: none; }
+
+  @media (max-width: 720px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    form { grid-template-columns: 1fr; }
+    .bar-row .k { width: 110px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 6v7" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="12" cy="17" r="1.6" fill="#3D9A5C"/>
+      </svg>
+    </div>
+    <div class="brand"><span class="err">Error</span><span class="eng">Engine</span><span class="dot">.</span></div>
+  </header>
+  <p class="tagline">Tracks errors, replacements, misprints, and issues to drive accountability and continuous improvement.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="dash">Dashboard</button>
+    <button class="tab" data-tab="log">Log an Error</button>
+    <button class="tab" data-tab="records">Records</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section id="dash">
+    <div class="grid">
+      <div class="stat"><div class="label">Total Errors</div><div class="value" id="s-total">0</div></div>
+      <div class="stat"><div class="label">Open</div><div class="value purple" id="s-open">0</div></div>
+      <div class="stat"><div class="label">Resolved</div><div class="value green" id="s-resolved">0</div></div>
+      <div class="stat"><div class="label">Cost to Remake</div><div class="value" id="s-cost">$0</div></div>
+    </div>
+    <div class="panel">
+      <h2>Errors by Type</h2>
+      <div id="by-type"><div class="empty">No data yet — log your first error.</div></div>
+    </div>
+    <div class="panel">
+      <h2>Errors by Root Cause</h2>
+      <div id="by-cause"></div>
+    </div>
+  </section>
+
+  <!-- LOG FORM -->
+  <section id="log" class="hidden">
+    <div class="panel">
+      <h2>New Error Record</h2>
+      <form id="error-form">
+        <div class="field">
+          <label>Error Type <span class="req">*</span></label>
+          <select name="error_type" required id="f-type"></select>
+        </div>
+        <div class="field">
+          <label>Root Cause <span class="req">*</span></label>
+          <select name="root_cause" required id="f-cause"></select>
+        </div>
+        <div class="field">
+          <label>Invoice / Visual ID</label>
+          <input name="invoice_ref" placeholder="e.g. 18432" />
+        </div>
+        <div class="field">
+          <label>Customer</label>
+          <select name="customer_id" id="f-customer">
+            <option value="">— select (from BackBone) —</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Owner (AM / CSR / Vendor)</label>
+          <input name="owner" placeholder="e.g. J. Smith" />
+        </div>
+        <div class="field">
+          <label>Status <span class="req">*</span></label>
+          <select name="status" required id="f-status"></select>
+        </div>
+        <div class="field">
+          <label>Units Affected</label>
+          <input name="units" type="number" min="0" placeholder="0" />
+        </div>
+        <div class="field">
+          <label>Cost ($)</label>
+          <input name="cost" type="number" min="0" step="0.01" placeholder="0.00" />
+        </div>
+        <div class="field full">
+          <label>What happened & why</label>
+          <textarea name="description" placeholder="Describe the error and the root cause so it can be evaluated later."></textarea>
+        </div>
+        <div class="actions">
+          <button class="primary" type="submit">Log Error</button>
+          <span class="msg" id="form-msg"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- RECORDS -->
+  <section id="records" class="hidden">
+    <div class="panel">
+      <h2>All Records</h2>
+      <div id="records-body"><div class="empty">No records yet.</div></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ERROR_TYPES = ['misprint','wrong garment','wrong size/color','short ship','late','art error','vendor defect','replacement/reprint'];
+const ROOT_CAUSES = ['art','production','purchasing','vendor','CSR','customer-supplied'];
+const STATUSES = ['open','in review','resolved','written-off'];
+
+// LIVE MODE. When deployed, hits /api/intake + /api/customers.
+// Auto-falls back to an in-memory demo store if the API isn't reachable
+// (e.g. opening this file directly), so the UI always works.
+let LIVE = true;
+let STORE = [];
+let counter = 0;
+
+// Probe once: if /api/intake isn't there, drop to demo mode silently.
+async function probe() {
+  try {
+    const r = await fetch('/api/intake', { method: 'HEAD' });
+    // 401 still means the API exists (auth guard) — stay LIVE.
+    LIVE = r.status !== 404;
+  } catch (e) { LIVE = false; }
+}
+
+function fillSelect(id, opts) {
+  document.getElementById(id).innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
+}
+fillSelect('f-type', ERROR_TYPES);
+fillSelect('f-cause', ROOT_CAUSES);
+fillSelect('f-status', STATUSES);
+
+// Load BackBone customers (read-only) into the dropdown.
+async function loadCustomers() {
+  if (!LIVE) return;
+  try {
+    const r = await fetch('/api/customers');
+    if (!r.ok) return;
+    const { customers } = await r.json();
+    const sel = document.getElementById('f-customer');
+    customers.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.customer_id; o.textContent = c.name;
+      sel.appendChild(o);
+    });
+  } catch (e) { /* dropdown just stays empty */ }
+}
+
+// Tabs
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  ['dash','log','records'].forEach(s => document.getElementById(s).classList.add('hidden'));
+  document.getElementById(t.dataset.tab).classList.remove('hidden');
+}));
+
+async function loadErrors() {
+  if (LIVE) {
+    const r = await fetch('/api/intake');
+    if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || ('HTTP ' + r.status));
+    return (await r.json()).errors;
+  }
+  return STORE;
+}
+async function saveError(rec) {
+  if (LIVE) {
+    const r = await fetch('/api/intake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rec),
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(j.error + (j.details ? ': ' + j.details.join('; ') : ''));
+    return j.record;
+  }
+  counter++;
+  rec.error_id = 'EE-' + String(counter).padStart(5,'0');
+  rec.date_logged = new Date().toISOString();
+  if (rec.invoice_ref && !rec.customer) rec.customer = '(unresolved — Printavo not connected)';
+  STORE.push(rec);
+  return rec;
+}
+
+function pillClass(s) {
+  return s === 'open' ? 'open' : s === 'in review' ? 'review' : s === 'resolved' ? 'resolved' : 'written';
+}
+
+function renderBars(containerId, counts) {
+  const el = document.getElementById(containerId);
+  const entries = Object.entries(counts).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]);
+  if (!entries.length) { el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
+  const max = Math.max(...entries.map(e => e[1]));
+  el.innerHTML = entries.map(([k,v]) =>
+    `<div class="bar-row"><div class="k">${k}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/max)*100}%"></div></div><div class="v">${v}</div></div>`
+  ).join('');
+}
+
+async function render() {
+  const errors = await loadErrors();
+  const total = errors.length;
+  const open = errors.filter(e => e.status === 'open').length;
+  const resolved = errors.filter(e => e.status === 'resolved').length;
+  const cost = errors.reduce((s,e) => s + (Number(e.cost)||0), 0);
+
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-open').textContent = open;
+  document.getElementById('s-resolved').textContent = resolved;
+  document.getElementById('s-cost').textContent = '$' + cost.toLocaleString(undefined,{maximumFractionDigits:0});
+
+  const typeCounts = Object.fromEntries(ERROR_TYPES.map(t => [t, 0]));
+  const causeCounts = Object.fromEntries(ROOT_CAUSES.map(c => [c, 0]));
+  errors.forEach(e => { if (typeCounts[e.error_type]!=null) typeCounts[e.error_type]++; if (causeCounts[e.root_cause]!=null) causeCounts[e.root_cause]++; });
+  renderBars('by-type', typeCounts);
+  renderBars('by-cause', causeCounts);
+
+  const body = document.getElementById('records-body');
+  if (!errors.length) { body.innerHTML = '<div class="empty">No records yet.</div>'; return; }
+  const rows = [...errors].reverse().map(e => `
+    <tr>
+      <td>${e.error_id}</td>
+      <td>${e.error_type}</td>
+      <td>${e.root_cause}</td>
+      <td>${e.customer || '—'}</td>
+      <td>${e.owner || '—'}</td>
+      <td>${e.units || '—'}</td>
+      <td>$${(Number(e.cost)||0).toLocaleString()}</td>
+      <td><span class="pill ${pillClass(e.status)}">${e.status}</span></td>
+    </tr>`).join('');
+  body.innerHTML = `<table><thead><tr>
+    <th>ID</th><th>Type</th><th>Cause</th><th>Customer</th><th>Owner</th><th>Units</th><th>Cost</th><th>Status</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+document.getElementById('error-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const fd = new FormData(ev.target);
+  const rec = Object.fromEntries(fd.entries());
+  const msg = document.getElementById('form-msg');
+  try {
+    const saved = await saveError(rec);
+    msg.textContent = `Logged ${saved.error_id}`;
+    msg.className = 'msg ok';
+    ev.target.reset();
+    await render();
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+  } catch (e) {
+    msg.textContent = 'Error: ' + e.message;
+    msg.className = 'msg err';
+  }
+});
+
+(async () => {
+  await probe();
+  await loadCustomers();
+  await render();
+})();
+</script>
+</body>
+</html>
