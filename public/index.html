@@ -10,8 +10,8 @@
   :root {
     --bg: #F4F6F8;
     --green: #3D9A5C;
-    --purple: #7B5EA7;
-    --purple-deep: #5E4585;
+    --purple: #745DA8;
+    --purple-deep: #5B4788;
     --ink: #1C2430;
     --muted: #6B7684;
     --card: #FFFFFF;
@@ -35,10 +35,11 @@
     background: var(--purple); display: grid; place-items: center; flex: none;
   }
   .mark svg { width: 26px; height: 26px; }
+  .mark-img { width: 44px; height: 44px; border-radius: 50%; flex: none; display: block; }
   .brand { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
   .brand .err { color: var(--purple); }
   .brand .eng { color: var(--ink); }
-  .brand .dot { color: var(--green); }
+  .brand .dot { color: var(--purple); }
   .tagline { color: var(--muted); font-size: 14px; margin: 2px 0 28px 58px; }
 
   /* Tabs */
@@ -141,12 +142,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="mark">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 6v7" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
-        <circle cx="12" cy="17" r="1.6" fill="#3D9A5C"/>
-      </svg>
-    </div>
+    <img src="/brand/errorengine-mark.png" alt="ErrorEngine" class="mark-img" />
     <div class="brand"><span class="err">Error</span><span class="eng">Engine</span><span class="dot">.</span></div>
     <a href="#" id="logout" style="margin-left:auto;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none">Sign out</a>
   </header>
