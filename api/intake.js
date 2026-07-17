@@ -8,7 +8,7 @@
 
 import { requireAuth } from "../lib/session.js";
 import { validateRecord } from "../lib/schema.js";
-import { listErrors, saveError, nextErrorId, resolveFromBackbone } from "../lib/data.js";
+import { listErrors, saveError, nextErrorId, resolveFromBackbone, deleteError } from "../lib/data.js";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -45,7 +45,19 @@ export default async function handler(req, res) {
       return res.status(201).json({ ok: true, record });
     }
 
-    res.setHeader("Allow", "GET, POST");
+    if (req.method === "DELETE") {
+      // Admin-only. Deleting error records is destructive, so gate on role.
+      if (sess.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can delete errors" });
+      }
+      const id = (req.query && req.query.id) || (req.body && req.body.id);
+      if (!id) return res.status(400).json({ error: "Missing error id" });
+      const removed = await deleteError(id);
+      if (!removed) return res.status(404).json({ error: "Error not found" });
+      return res.status(200).json({ ok: true, deleted: id });
+    }
+
+    res.setHeader("Allow", "GET, POST, DELETE");
     return res.status(405).json({ error: "Method not allowed" });
   } catch (e) {
     console.error("intake error:", e);
