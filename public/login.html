@@ -8,17 +8,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #F4F6F8; --green: #3D9A5C; --purple: #7B5EA7; --purple-deep: #5E4585;
+    --bg: #F4F6F8; --green: #3D9A5C; --purple: #745DA8; --purple-deep: #5B4788;
     --ink: #1C2430; --muted: #6B7684; --card: #FFFFFF; --line: #E4E8EC;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; display: grid; place-items: center; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 34px 32px; width: 100%; max-width: 380px; }
   .brand { display: flex; align-items: center; gap: 12px; justify-content: center; margin-bottom: 6px; }
-  .mark { width: 40px; height: 40px; border-radius: 50%; background: var(--purple); display: grid; place-items: center; }
+  .mark { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; }
   .mark svg { width: 24px; height: 24px; }
   .name { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
-  .name .a { color: var(--purple); } .name .b { color: var(--ink); } .name .d { color: var(--green); }
+  .name .a { color: var(--purple); } .name .b { color: var(--ink); } .name .d { color: var(--purple); }
   .sub { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 24px; }
   label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; }
   input { width: 100%; font-family: inherit; font-size: 14px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 16px; }
@@ -33,7 +33,7 @@
 <body>
   <div class="card">
     <div class="brand">
-      <div class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M12 6v7" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="17" r="1.6" fill="#3D9A5C"/></svg></div>
+      <div class="mark"><img src="/brand/errorengine-mark.png" alt="ErrorEngine" style="width:40px;height:40px;display:block" /></div>
       <div class="name"><span class="a">Error</span><span class="b">Engine</span><span class="d">.</span></div>
     </div>
     <p class="sub" id="sub">Sign in to continue</p>
