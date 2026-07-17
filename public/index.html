@@ -127,6 +127,8 @@
   .pill.resolved { background: #E7F5EC; color: var(--green); }
   .pill.written { background: #EEE9F5; color: var(--purple-deep); }
   .empty { text-align: center; color: var(--muted); padding: 40px 0; }
+  .del-btn { background: none; border: 1px solid var(--line); color: #C0392B; width: 26px; height: 26px; border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1; }
+  .del-btn:hover { background: #FDECEA; border-color: #C0392B; }
   .hidden { display: none; }
 
   @media (max-width: 720px) {
@@ -202,11 +204,11 @@
           <select name="root_cause" required id="f-cause"></select>
         </div>
         <div class="field">
-          <label>Invoice / Visual ID</label>
-          <input name="invoice_ref" placeholder="e.g. 18432" />
+          <label>Invoice / Visual ID <span class="req">*</span></label>
+          <input name="invoice_ref" required placeholder="e.g. 18432" />
         </div>
         <div class="field">
-          <label>Customer</label>
+          <label>Customer <span class="req">*</span></label>
           <div class="combo" id="customer-combo">
             <input type="text" id="customer-search" placeholder="Type to search BackBone…" autocomplete="off" />
             <input type="hidden" name="customer_id" id="f-customer" />
@@ -222,16 +224,16 @@
           <select name="status" required id="f-status"></select>
         </div>
         <div class="field">
-          <label>Units Affected</label>
-          <input name="units" type="number" min="0" placeholder="0" />
+          <label>Units Affected <span class="req">*</span></label>
+          <input name="units" type="number" min="0" required placeholder="0" />
         </div>
         <div class="field">
-          <label>Cost ($)</label>
-          <input name="cost" type="number" min="0" step="0.01" placeholder="0.00" />
+          <label>Cost ($) <span class="req">*</span></label>
+          <input name="cost" type="number" min="0" step="0.01" required placeholder="0.00" />
         </div>
         <div class="field full">
-          <label>What happened & why</label>
-          <textarea name="description" placeholder="Describe the error and the root cause so it can be evaluated later."></textarea>
+          <label>What happened & why <span class="req">*</span></label>
+          <textarea name="description" required placeholder="Describe the error and the root cause so it can be evaluated later."></textarea>
         </div>
         <div class="actions">
           <button class="primary" type="submit">Log Error</button>
@@ -492,6 +494,7 @@ async function render() {
   // Records tab shows ALL records regardless of the dashboard year filter.
   const body = document.getElementById('records-body');
   if (!ALL_ERRORS.length) { body.innerHTML = '<div class="empty">No records yet.</div>'; return; }
+  const isAdmin = CURRENT_USER && CURRENT_USER.role === 'admin';
   const rows = [...ALL_ERRORS].reverse().map(e => `
     <tr>
       <td>${e.error_id}</td>
@@ -502,9 +505,10 @@ async function render() {
       <td>${e.units || '—'}</td>
       <td>$${(Number(e.cost)||0).toLocaleString()}</td>
       <td><span class="pill ${pillClass(e.status)}">${titleCase(e.status)}</span></td>
+      ${isAdmin ? `<td><button class="del-btn" data-id="${e.error_id}" title="Delete">✕</button></td>` : ''}
     </tr>`).join('');
   body.innerHTML = `<table><thead><tr>
-    <th>ID</th><th>Type</th><th>Cause</th><th>Customer</th><th>Owner</th><th>Units</th><th>Cost</th><th>Status</th>
+    <th>ID</th><th>Type</th><th>Cause</th><th>Customer</th><th>Owner</th><th>Units</th><th>Cost</th><th>Status</th>${isAdmin ? '<th></th>' : ''}
     </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -546,11 +550,23 @@ document.getElementById('error-form').addEventListener('submit', async (ev) => {
   const fd = new FormData(ev.target);
   const rec = Object.fromEntries(fd.entries());
   const msg = document.getElementById('form-msg');
+
+  // Customer is a searchable combo (hidden input), so browser 'required' can't see it.
+  if (!rec.customer_id) {
+    msg.textContent = 'Please select a customer from the list.';
+    msg.className = 'msg err';
+    document.getElementById('customer-search').focus();
+    return;
+  }
+
   try {
     const saved = await saveError(rec);
     msg.textContent = `Logged ${saved.error_id}`;
     msg.className = 'msg ok';
     ev.target.reset();
+    document.getElementById('customer-search').value = '';
+    document.getElementById('f-customer').value = '';
+    updateVendorField();
     await render();
     setTimeout(() => { msg.textContent = ''; }, 3000);
   } catch (e) {
@@ -559,11 +575,26 @@ document.getElementById('error-form').addEventListener('submit', async (ev) => {
   }
 });
 
+document.getElementById('records-body').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.del-btn');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (!confirm(`Delete error ${id}? This can't be undone.`)) return;
+  try {
+    const r = await fetch('/api/intake?id=' + encodeURIComponent(id), { method: 'DELETE' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { alert(j.error || 'Delete failed'); return; }
+    await render();
+  } catch (err) { alert('Delete failed: ' + err.message); }
+});
+
 document.getElementById('logout').addEventListener('click', async (e) => {
   e.preventDefault();
   await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'logout'}) });
   window.location.href = '/login.html';
 });
+
+let CURRENT_USER = null;
 
 // Gate the whole app on a valid session. If not signed in, go to login.
 async function ensureAuth() {
@@ -571,6 +602,7 @@ async function ensureAuth() {
     const r = await fetch('/api/auth?action=me');
     const j = await r.json();
     if (!j.authenticated) { window.location.href = '/login.html'; return null; }
+    CURRENT_USER = j.user;
     return j.user;
   } catch (e) { window.location.href = '/login.html'; return null; }
 }
