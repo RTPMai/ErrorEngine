@@ -7,8 +7,11 @@
 // signature BackBone uses. Do NOT wrap the handler; call requireAuth inside it.
 
 import { requireAuth } from "../lib/session.js";
-import { validateRecord } from "../lib/schema.js";
-import { listErrors, saveError, nextErrorId, resolveFromBackbone, deleteError } from "../lib/data.js";
+import { validateRecord, validatePatch } from "../lib/schema.js";
+import {
+  listErrors, saveError, nextErrorId, resolveFromBackbone, deleteError,
+  getError, updateError, bulkUpdateErrors,
+} from "../lib/data.js";
 
 // Vercel doesn't always pre-parse JSON bodies. Normalize so field access is safe.
 function parseBody(req) {
@@ -28,7 +31,47 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === "GET") {
+      // ?id=EE-00001 fetches a single record for the detail view.
+      const id = req.query && req.query.id;
+      if (id) {
+        const rec = await getError(id);
+        if (!rec) return res.status(404).json({ error: "Error not found" });
+        return res.status(200).json({ record: rec });
+      }
       return res.status(200).json({ errors: await listErrors() });
+    }
+
+    // PATCH — edit a record, or change status on many at once.
+    //   single: /api/intake?id=EE-00001   body = { status: "resolved", ... }
+    //   bulk:   /api/intake               body = { ids: [...], patch: {...} }
+    if (req.method === "PATCH") {
+      const body = parseBody(req);
+      const qid = req.query && req.query.id;
+
+      // ---- bulk ----
+      if (Array.isArray(body.ids)) {
+        if (!body.ids.length) return res.status(400).json({ error: "ids array is empty" });
+        if (body.ids.length > 500) return res.status(400).json({ error: "Too many ids (max 500)" });
+
+        const { ok, errors, patch } = validatePatch(body.patch || {});
+        if (!ok) return res.status(400).json({ error: "Validation failed", details: errors });
+        if (!Object.keys(patch).length) return res.status(400).json({ error: "No editable fields in patch" });
+
+        const { updated, missing } = await bulkUpdateErrors(body.ids, patch);
+        return res.status(200).json({ ok: true, updated: updated.length, missing, records: updated });
+      }
+
+      // ---- single ----
+      const id = qid || body.error_id || body.id;
+      if (!id) return res.status(400).json({ error: "Missing error id" });
+
+      const { ok, errors, patch } = validatePatch(body);
+      if (!ok) return res.status(400).json({ error: "Validation failed", details: errors });
+      if (!Object.keys(patch).length) return res.status(400).json({ error: "No editable fields in patch" });
+
+      const record = await updateError(id, patch);
+      if (!record) return res.status(404).json({ error: "Error not found" });
+      return res.status(200).json({ ok: true, record });
     }
 
     if (req.method === "POST") {
@@ -68,7 +111,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, deleted: id });
     }
 
-    res.setHeader("Allow", "GET, POST, DELETE");
+    res.setHeader("Allow", "GET, POST, PATCH, DELETE");
     return res.status(405).json({ error: "Method not allowed" });
   } catch (e) {
     console.error("intake error:", e);
