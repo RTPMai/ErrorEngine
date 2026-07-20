@@ -39,7 +39,10 @@ export default async function handler(req, res) {
 
       record.error_id = await nextErrorId();
       record.date_logged = new Date().toISOString();
-      record.logged_by = sess.username || sess.name || sess.role || "unknown";
+      // Attribution comes from the SESSION only — never trust a client-supplied
+      // logged_by, or anyone could forge who recorded an error.
+      record.logged_by = sess.username || "unknown";
+      record.logged_by_name = sess.name || sess.username || "Unknown";
 
       await saveError(record);
       return res.status(201).json({ ok: true, record });
