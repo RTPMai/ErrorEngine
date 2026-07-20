@@ -8,7 +8,7 @@
 // lib/session.js send a 403 for any non-admin, so only admins reach the body.
 
 import { requireAuth } from "../lib/session.js";
-import { listUsers, createUser, deleteUser, getRoles } from "../lib/users.js";
+import { listUsers, createUser, deleteUser, getRoles } from "../lib/user-store.js";
 
 // Vercel doesn't always pre-parse JSON bodies. Normalize so field access is safe.
 function parseBody(req) {
