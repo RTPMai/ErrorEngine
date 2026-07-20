@@ -17,7 +17,15 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const action = (req.query && req.query.action) || (req.body && req.body.action) || "";
+  // Vercel usually parses JSON bodies, but not always (depends on content-type and
+  // runtime). Normalize to an object so `body.action` is reliable either way.
+  let body = req.body;
+  if (typeof body === "string") {
+    try { body = JSON.parse(body); } catch (e) { body = {}; }
+  }
+  if (!body || typeof body !== "object") body = {};
+
+  const action = (req.query && req.query.action) || body.action || "";
 
   try {
     // ---- who am I ----
@@ -40,8 +48,6 @@ export default async function handler(req, res) {
       res.setHeader("Allow", "GET, POST");
       return res.status(405).json({ error: "Method not allowed" });
     }
-
-    const body = req.body || {};
 
     // ---- logout ----
     if (action === "logout") {
