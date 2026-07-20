@@ -10,6 +10,14 @@ import { requireAuth } from "../lib/session.js";
 import { validateRecord } from "../lib/schema.js";
 import { listErrors, saveError, nextErrorId, resolveFromBackbone, deleteError } from "../lib/data.js";
 
+// Vercel doesn't always pre-parse JSON bodies. Normalize so field access is safe.
+function parseBody(req) {
+  let b = req.body;
+  if (typeof b === "string") { try { b = JSON.parse(b); } catch (e) { b = {}; } }
+  return b && typeof b === "object" ? b : {};
+}
+
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -24,7 +32,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const body = req.body || {};
+      const body = parseBody(req);
 
       // Resolve customer + owner from BackBone (read-only) when a customer_id is given
       // and the caller didn't supply them explicitly.
@@ -53,7 +61,7 @@ export default async function handler(req, res) {
       if (sess.role !== "admin") {
         return res.status(403).json({ error: "Only admins can delete errors" });
       }
-      const id = (req.query && req.query.id) || (req.body && req.body.id);
+      const id = (req.query && req.query.id) || parseBody(req).id;
       if (!id) return res.status(400).json({ error: "Missing error id" });
       const removed = await deleteError(id);
       if (!removed) return res.status(404).json({ error: "Error not found" });
