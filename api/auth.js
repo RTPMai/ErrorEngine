@@ -11,7 +11,7 @@
 //   bootstrap POST { username, password, name } -> creates FIRST admin, only if no users exist
 
 import { setSessionCookie, clearSessionCookie, getSession } from "../lib/session.js";
-import { authenticate, createUser, noUsersYet, touchLastLogin } from "../lib/users.js";
+import { authenticate, createUser, noUsersYet, touchLastLogin } from "../lib/user-store.js";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
