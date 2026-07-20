@@ -7,11 +7,33 @@
 // signature BackBone uses. Do NOT wrap the handler; call requireAuth inside it.
 
 import { requireAuth } from "../lib/session.js";
-import { validateRecord, validatePatch } from "../lib/schema.js";
+import { validateRecordWith, validatePatchWith } from "../lib/schema.js";
 import {
   listErrors, saveError, nextErrorId, resolveFromBackbone, deleteError,
   getError, updateError, bulkUpdateErrors,
 } from "../lib/data.js";
+import { getTaxonomy } from "../lib/taxonomy-store.js";
+
+// Values accepted by the validator = ALL options, active or retired. A retired
+// option must still validate, or every historical record using it would become
+// uneditable the moment management retires it.
+async function allowedValues() {
+  const tax = await getTaxonomy();
+  const out = {};
+  for (const [field, list] of Object.entries(tax)) out[field] = list.map((o) => o.value);
+  return out;
+}
+
+// For NEW records, restrict to ACTIVE options — a retired type shouldn't be
+// selectable going forward even if someone crafts the request by hand.
+async function activeValues() {
+  const tax = await getTaxonomy();
+  const out = {};
+  for (const [field, list] of Object.entries(tax)) {
+    out[field] = list.filter((o) => o.active).map((o) => o.value);
+  }
+  return out;
+}
 
 // Vercel doesn't always pre-parse JSON bodies. Normalize so field access is safe.
 function parseBody(req) {
@@ -53,7 +75,7 @@ export default async function handler(req, res) {
         if (!body.ids.length) return res.status(400).json({ error: "ids array is empty" });
         if (body.ids.length > 500) return res.status(400).json({ error: "Too many ids (max 500)" });
 
-        const { ok, errors, patch } = validatePatch(body.patch || {});
+        const { ok, errors, patch } = validatePatchWith(body.patch || {}, await allowedValues());
         if (!ok) return res.status(400).json({ error: "Validation failed", details: errors });
         if (!Object.keys(patch).length) return res.status(400).json({ error: "No editable fields in patch" });
 
@@ -65,7 +87,7 @@ export default async function handler(req, res) {
       const id = qid || body.error_id || body.id;
       if (!id) return res.status(400).json({ error: "Missing error id" });
 
-      const { ok, errors, patch } = validatePatch(body);
+      const { ok, errors, patch } = validatePatchWith(body, await allowedValues());
       if (!ok) return res.status(400).json({ error: "Validation failed", details: errors });
       if (!Object.keys(patch).length) return res.status(400).json({ error: "No editable fields in patch" });
 
@@ -85,7 +107,7 @@ export default async function handler(req, res) {
         if (resolved.owner && !body.owner) body.owner = resolved.owner;
       }
 
-      const { ok, errors, record } = validateRecord(body);
+      const { ok, errors, record } = validateRecordWith(body, await activeValues());
       if (!ok) return res.status(400).json({ error: "Validation failed", details: errors });
 
       record.error_id = await nextErrorId();
