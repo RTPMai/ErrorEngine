@@ -129,11 +129,64 @@
   .del-btn:hover { background: #FDECEA; border-color: #C0392B; }
   .hidden { display: none; }
 
+  /* Computed (read-only) inputs read as output, not as something to type in. */
+  input.computed { background: var(--bg); color: var(--ink); font-weight: 700; cursor: default; }
+  input.computed:focus { outline: none; border-color: var(--line); }
+  .hint { font-size: 12px; color: var(--muted); }
+
+  /* Clickable dashboard stat tiles */
+  .stat.clickable { cursor: pointer; transition: border-color .12s, transform .12s; }
+  .stat.clickable:hover { border-color: var(--purple); transform: translateY(-1px); }
+  .stat.clickable:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+  .stat .drill { font-size: 11px; color: var(--purple); font-weight: 600; margin-top: 4px; opacity: 0; }
+  .stat.clickable:hover .drill { opacity: 1; }
+
+  /* Records table: rows drill into detail */
+  tr.rec-row { cursor: pointer; }
+  tr.rec-row:hover td { background: #FAF8FD; }
+  td.check-cell, th.check-cell { width: 34px; cursor: default; }
+  td.check-cell input, th.check-cell input { cursor: pointer; width: 15px; height: 15px; accent-color: var(--purple); }
+
+  /* Bulk action bar — only shown when rows are selected */
+  .bulk-bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #EEE9F5;
+    border: 1px solid var(--purple); border-radius: 8px; margin-bottom: 14px; }
+  .bulk-bar .count { font-size: 13px; font-weight: 700; color: var(--purple-deep); }
+  .bulk-bar select { font-family: inherit; font-size: 13px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; }
+  .btn-sm { background: var(--purple); color: #fff; border: none; padding: 8px 14px; border-radius: 7px;
+    font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .btn-sm:hover { background: var(--purple-deep); }
+  .btn-sm:disabled { background: var(--muted); cursor: not-allowed; opacity: .6; }
+  .btn-ghost { background: none; border: 1px solid var(--line); color: var(--muted); padding: 7px 12px;
+    border-radius: 7px; font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .btn-ghost:hover { border-color: var(--purple); color: var(--purple); }
+
+  /* Filter chip above the records table */
+  .filter-chip { display: inline-flex; align-items: center; gap: 8px; background: #EEE9F5; color: var(--purple-deep);
+    padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+  .filter-chip button { background: none; border: none; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
+
+  /* Post-submit confirmation on the dashboard */
+  .flash { display: none; background: #E7F5EC; border: 1px solid var(--green); color: #256B41;
+    padding: 12px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; margin-bottom: 18px; }
+  .flash.show { display: block; }
+
+  /* Record detail view */
+  .detail-head { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+  .detail-head h2 { font-size: 20px; font-weight: 800; margin: 0; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .detail-grid .full { grid-column: 1 / -1; }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px;
+    padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--line); }
+  .meta .m-k { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  .meta .m-v { font-size: 14px; margin-top: 2px; }
+
   @media (max-width: 720px) {
     .grid { grid-template-columns: repeat(2, 1fr); }
     form { grid-template-columns: 1fr; }
     .bar-row .k { width: 110px; }
+    .detail-grid { grid-template-columns: 1fr; }
   }
+
 </style>
 </head>
 <body>
@@ -165,9 +218,18 @@
       <select id="year-select"></select>
     </div>
     <div class="grid">
-      <div class="stat"><div class="label">Total Errors</div><div class="value" id="s-total">0</div></div>
-      <div class="stat"><div class="label">Open</div><div class="value purple" id="s-open">0</div></div>
-      <div class="stat"><div class="label">Resolved</div><div class="value green" id="s-resolved">0</div></div>
+      <div class="stat clickable" data-drill="all" role="button" tabindex="0">
+        <div class="label">Total Errors</div><div class="value" id="s-total">0</div>
+        <div class="drill">View records →</div>
+      </div>
+      <div class="stat clickable" data-drill="open" role="button" tabindex="0">
+        <div class="label">Open</div><div class="value purple" id="s-open">0</div>
+        <div class="drill">View records →</div>
+      </div>
+      <div class="stat clickable" data-drill="resolved" role="button" tabindex="0">
+        <div class="label">Resolved</div><div class="value green" id="s-resolved">0</div>
+        <div class="drill">View records →</div>
+      </div>
       <div class="stat"><div class="label">Cost to Remake</div><div class="value" id="s-cost">$0</div></div>
     </div>
     <div class="panel">
@@ -187,6 +249,19 @@
     <div class="panel">
       <h2>Errors by Root Cause</h2>
       <div id="by-cause"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Errors by Vendor</h2>
+        <div class="toggle" id="vendor-metric">
+          <button class="tog active" data-metric="count">Count</button>
+          <button class="tog" data-metric="cost">Cost</button>
+        </div>
+      </div>
+      <div id="by-vendor"></div>
+      <p class="hint" style="margin-top:12px">
+        Vendor-attributed errors — root cause “vendor” or type “vendor defect”, grouped by the owner recorded on each error.
+      </p>
     </div>
   </section>
 
@@ -225,11 +300,16 @@
         </div>
         <div class="field">
           <label>Units Affected <span class="req">*</span></label>
-          <input name="units" type="number" min="0" required placeholder="0" />
+          <input name="units" id="f-units" type="number" min="0" required placeholder="0" />
         </div>
         <div class="field">
-          <label>Cost ($) <span class="req">*</span></label>
-          <input name="cost" type="number" min="0" step="0.01" required placeholder="0.00" />
+          <label>Cost per Unit ($) <span class="req">*</span></label>
+          <input name="unit_cost" id="f-unit-cost" type="number" min="0" step="0.01" required placeholder="0.00" />
+        </div>
+        <div class="field">
+          <label>Total Cost</label>
+          <input id="f-cost-display" type="text" readonly tabindex="-1" class="computed" value="$0.00" />
+          <span class="hint">Cost per unit × units</span>
         </div>
         <div class="field full">
           <label>What happened & why <span class="req">*</span></label>
@@ -282,8 +362,72 @@
   <!-- RECORDS -->
   <section id="records" class="hidden">
     <div class="panel">
-      <h2>All Records</h2>
+      <div class="panel-head">
+        <h2 id="records-title">All Records</h2>
+        <div class="dash-controls" style="margin:0">
+          <label for="status-filter">Status</label>
+          <select id="status-filter"></select>
+        </div>
+      </div>
+      <div id="filter-chip-wrap"></div>
+      <div id="bulk-bar-wrap"></div>
       <div id="records-body"><div class="empty">No records yet.</div></div>
+    </div>
+  </section>
+
+  <!-- RECORD DETAIL -->
+  <section id="detail" class="hidden">
+    <div class="panel">
+      <div class="detail-head">
+        <button class="btn-ghost" id="detail-back">← Back to records</button>
+        <h2 id="detail-id">—</h2>
+        <span id="detail-pill"></span>
+        <span class="msg" id="detail-msg" style="margin-left:auto"></span>
+      </div>
+      <form id="detail-form" class="detail-grid">
+        <div class="field">
+          <label>Status</label>
+          <select name="status" id="d-status"></select>
+        </div>
+        <div class="field">
+          <label>Error Type</label>
+          <select name="error_type" id="d-type"></select>
+        </div>
+        <div class="field">
+          <label>Root Cause</label>
+          <select name="root_cause" id="d-cause"></select>
+        </div>
+        <div class="field">
+          <label>Invoice / Visual ID</label>
+          <input name="invoice_ref" id="d-invoice" />
+        </div>
+        <div class="field">
+          <label>Owner / Vendor</label>
+          <input name="owner" id="d-owner" placeholder="—" />
+        </div>
+        <div class="field">
+          <label>Units Affected</label>
+          <input name="units" id="d-units" type="number" min="0" />
+        </div>
+        <div class="field">
+          <label>Cost per Unit ($)</label>
+          <input name="unit_cost" id="d-unit-cost" type="number" min="0" step="0.01" />
+        </div>
+        <div class="field">
+          <label>Total Cost</label>
+          <input id="d-cost-display" type="text" readonly tabindex="-1" class="computed" value="$0.00" />
+          <span class="hint">Cost per unit × units</span>
+        </div>
+        <div class="field full">
+          <label>What happened & why</label>
+          <textarea name="description" id="d-description"></textarea>
+        </div>
+        <div class="actions">
+          <button class="primary" type="submit">Save changes</button>
+          <button class="btn-ghost" type="button" id="detail-reset">Discard</button>
+        </div>
+      </form>
+      <div class="meta" id="detail-meta"></div>
     </div>
   </section>
 </div>
@@ -322,6 +466,36 @@ function fillSelect(id, opts) {
 fillSelect('f-type', ERROR_TYPES);
 fillSelect('f-cause', ROOT_CAUSES);
 fillSelect('f-status', STATUSES);
+
+// ---- Money ----
+// Cost is ALWAYS unit_cost x units. The input is read-only and the server
+// recomputes it on write, so the displayed figure can't drift from the stored one.
+function round2(n) { return Math.round((Number(n) + Number.EPSILON) * 100) / 100; }
+function money(n) {
+  return '$' + round2(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function computeCost(unitsEl, unitCostEl, displayEl) {
+  const u = Number(unitsEl.value), uc = Number(unitCostEl.value);
+  const valid = unitsEl.value !== '' && unitCostEl.value !== '' && !isNaN(u) && !isNaN(uc);
+  displayEl.value = valid ? money(uc * u) : '$0.00';
+}
+function wireCost(unitsId, unitCostId, displayId) {
+  const u = document.getElementById(unitsId);
+  const uc = document.getElementById(unitCostId);
+  const d = document.getElementById(displayId);
+  const run = () => computeCost(u, uc, d);
+  u.addEventListener('input', run);
+  uc.addEventListener('input', run);
+  return run;
+}
+const recomputeLogCost = wireCost('f-units', 'f-unit-cost', 'f-cost-display');
+
+// Older records predate unit_cost — derive it so the detail view isn't blank.
+function unitCostOf(e) {
+  if (e.unit_cost != null && e.unit_cost !== '') return Number(e.unit_cost);
+  const u = Number(e.units), c = Number(e.cost);
+  return u > 0 && !isNaN(c) ? round2(c / u) : 0;
+}
 
 // Owner field is vendor-only: show it (required) just for "vendor defect".
 // For all other error types the accountable AM/CSR comes from BackBone automatically.
@@ -409,13 +583,21 @@ function initCustomerCombo() {
 }
 initCustomerCombo();
 
-// Tabs
-document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
-  ['dash','log','records','settings'].forEach(s => document.getElementById(s).classList.add('hidden'));
-  document.getElementById(t.dataset.tab).classList.remove('hidden');
-}));
+// Tabs. 'detail' is a section without its own tab — it's reached by clicking a
+// record, and highlights the Records tab while it's open.
+const SECTIONS = ['dash','log','records','settings','detail'];
+
+function showSection(name, tabName) {
+  SECTIONS.forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.classList.toggle('hidden', s !== name);
+  });
+  const activeTab = tabName || name;
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x.dataset.tab === activeTab));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showSection(t.dataset.tab)));
 
 async function loadErrors() {
   if (LIVE) {
@@ -444,24 +626,94 @@ async function saveError(rec) {
   return rec;
 }
 
+// Update one record. In demo mode, mutate the in-memory store instead.
+async function patchError(id, patch) {
+  if (LIVE) {
+    const r = await fetch('/api/intake?id=' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error + (j.details ? ': ' + j.details.join('; ') : ''));
+    return j.record;
+  }
+  const rec = STORE.find(x => x.error_id === id);
+  if (!rec) throw new Error('Error not found');
+  Object.assign(rec, patch);
+  rec.cost = round2(Number(rec.unit_cost || 0) * Number(rec.units || 0));
+  if (rec.status === 'resolved') { if (!rec.date_resolved) rec.date_resolved = new Date().toISOString(); }
+  else delete rec.date_resolved;
+  return rec;
+}
+
+// Apply one patch to many records in a single request.
+async function patchErrorsBulk(ids, patch) {
+  if (LIVE) {
+    const r = await fetch('/api/intake', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, patch }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error + (j.details ? ': ' + j.details.join('; ') : ''));
+    return j;
+  }
+  for (const id of ids) await patchError(id, patch);
+  return { updated: ids.length, missing: [] };
+}
+
 function pillClass(s) {
   return s === 'open' ? 'open' : s === 'in review' ? 'review' : s === 'resolved' ? 'resolved' : 'written';
 }
 
-function renderBars(containerId, counts) {
+// opts.format formats the trailing value (used for cost bars); opts.empty overrides
+// the empty-state copy; opts.wide widens the value column for dollar figures.
+function renderBars(containerId, counts, opts) {
+  opts = opts || {};
   const el = document.getElementById(containerId);
   const entries = Object.entries(counts).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]);
-  if (!entries.length) { el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
+  if (!entries.length) {
+    el.innerHTML = `<div class="empty">${opts.empty || 'No data yet.'}</div>`;
+    return;
+  }
   const max = Math.max(...entries.map(e => e[1]));
+  const fmt = opts.format || (v => v);
+  const vw = opts.wide ? ' style="width:74px"' : '';
   el.innerHTML = entries.map(([k,v]) =>
-    `<div class="bar-row"><div class="k">${titleCase(k)}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/max)*100}%"></div></div><div class="v">${v}</div></div>`
+    `<div class="bar-row"><div class="k" title="${escapeHtml(titleCase(k))}">${escapeHtml(titleCase(k))}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/max)*100}%"></div></div><div class="v"${vw}>${fmt(v)}</div></div>`
   ).join('');
+}
+
+// Vendor names are free text, so they must be escaped everywhere they're rendered.
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
+  ));
+}
+
+// An error counts as vendor-attributed when the root cause is "vendor" or the
+// type is "vendor defect". Grouped by `owner`, which the intake form collects as
+// the vendor name for those cases.
+function isVendorError(e) {
+  return e.root_cause === 'vendor' || e.error_type === 'vendor defect';
+}
+function vendorTotals(errors, metric) {
+  const out = {};
+  errors.filter(isVendorError).forEach(e => {
+    const name = (e.owner && String(e.owner).trim()) || 'Unattributed';
+    out[name] = (out[name] || 0) + (metric === 'cost' ? (Number(e.cost) || 0) : 1);
+  });
+  return out;
 }
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let ALL_ERRORS = [];        // full unfiltered set
 let selectedYear = new Date().getFullYear();
-let monthMetric = 'count';  // 'count' | 'cost'
+let monthMetric = 'count';   // 'count' | 'cost'
+let vendorMetric = 'count';  // 'count' | 'cost'
+let statusFilter = 'all';    // 'all' | one of STATUSES
+const selected = new Set();  // error_ids checked for bulk actions
 
 function errorYear(e) {
   const d = e.date_logged ? new Date(e.date_logged) : null;
@@ -500,59 +752,122 @@ function renderMonthChart(yearErrors) {
   ).join('');
 }
 
+// Fetch + draw everything. Use this after any write.
 async function render() {
-  // Load once per render; ALL_ERRORS is the master set, then we filter by year.
   ALL_ERRORS = await loadErrors();
   populateYearSelect();
+  draw();
+}
 
+// Draw from the cached set — no refetch. Every filter change routes through here,
+// so the dashboard and records table can never disagree about the data.
+function draw() {
   const yearErrors = selectedYear === 'all'
     ? ALL_ERRORS
     : ALL_ERRORS.filter(e => errorYear(e) === Number(selectedYear));
 
-  const total = yearErrors.length;
-  const open = yearErrors.filter(e => e.status === 'open').length;
-  const resolved = yearErrors.filter(e => e.status === 'resolved').length;
-  const cost = yearErrors.reduce((s,e) => s + (Number(e.cost)||0), 0);
+  renderDashboard(yearErrors);
+  renderRecords();
+}
 
-  document.getElementById('s-total').textContent = total;
-  document.getElementById('s-open').textContent = open;
-  document.getElementById('s-resolved').textContent = resolved;
+function renderDashboard(yearErrors) {
+  const cost = yearErrors.reduce((s,e) => s + (Number(e.cost)||0), 0);
+  document.getElementById('s-total').textContent = yearErrors.length;
+  document.getElementById('s-open').textContent = yearErrors.filter(e => e.status === 'open').length;
+  document.getElementById('s-resolved').textContent = yearErrors.filter(e => e.status === 'resolved').length;
   document.getElementById('s-cost').textContent = '$' + cost.toLocaleString(undefined,{maximumFractionDigits:0});
 
   renderMonthChart(yearErrors);
 
   const typeCounts = Object.fromEntries(ERROR_TYPES.map(t => [t, 0]));
   const causeCounts = Object.fromEntries(ROOT_CAUSES.map(c => [c, 0]));
-  yearErrors.forEach(e => { if (typeCounts[e.error_type]!=null) typeCounts[e.error_type]++; if (causeCounts[e.root_cause]!=null) causeCounts[e.root_cause]++; });
+  yearErrors.forEach(e => {
+    if (typeCounts[e.error_type] != null) typeCounts[e.error_type]++;
+    if (causeCounts[e.root_cause] != null) causeCounts[e.root_cause]++;
+  });
   renderBars('by-type', typeCounts);
   renderBars('by-cause', causeCounts);
 
-  // Records tab shows ALL records regardless of the dashboard year filter.
+  renderBars('by-vendor', vendorTotals(yearErrors, vendorMetric), {
+    empty: 'No vendor-attributed errors in this period.',
+    wide: vendorMetric === 'cost',
+    format: vendorMetric === 'cost'
+      ? (v => '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }))
+      : undefined,
+  });
+}
+
+// Records table. Honors the status filter (set directly, or by drilling in from a
+// dashboard tile) and the dashboard year filter.
+function renderRecords() {
   const body = document.getElementById('records-body');
-  if (!ALL_ERRORS.length) { body.innerHTML = '<div class="empty">No records yet.</div>'; return; }
   const isAdmin = CURRENT_USER && CURRENT_USER.role === 'admin';
-  const rows = [...ALL_ERRORS].reverse().map(e => `
-    <tr>
-      <td>${e.error_id}</td>
-      <td>${titleCase(e.error_type)}</td>
-      <td>${titleCase(e.root_cause)}</td>
-      <td>${e.customer || '—'}</td>
-      <td>${e.owner || '—'}</td>
+
+  let list = [...ALL_ERRORS];
+  if (selectedYear !== 'all') list = list.filter(e => errorYear(e) === Number(selectedYear));
+  if (statusFilter !== 'all') list = list.filter(e => e.status === statusFilter);
+
+  document.getElementById('records-title').textContent =
+    statusFilter === 'all' ? 'All Records' : titleCase(statusFilter) + ' Records';
+  renderFilterChip(list.length);
+
+  // Drop selections for rows that are no longer visible, so a hidden row can't be
+  // silently included in a bulk update.
+  const visible = new Set(list.map(e => e.error_id));
+  [...selected].forEach(id => { if (!visible.has(id)) selected.delete(id); });
+  renderBulkBar();
+
+  if (!list.length) {
+    body.innerHTML = `<div class="empty">${ALL_ERRORS.length ? 'No records match this filter.' : 'No records yet.'}</div>`;
+    return;
+  }
+
+  const rows = list.map(e => `
+    <tr class="rec-row" data-id="${escapeHtml(e.error_id)}">
+      <td class="check-cell"><input type="checkbox" class="row-check" data-id="${escapeHtml(e.error_id)}"${selected.has(e.error_id) ? ' checked' : ''} /></td>
+      <td>${escapeHtml(e.error_id)}</td>
+      <td>${escapeHtml(titleCase(e.error_type))}</td>
+      <td>${escapeHtml(titleCase(e.root_cause))}</td>
+      <td>${escapeHtml(e.customer || '—')}</td>
+      <td>${escapeHtml(e.owner || '—')}</td>
       <td>${e.units || '—'}</td>
-      <td>$${(Number(e.cost)||0).toLocaleString()}</td>
-      <td>${e.logged_by_name || e.logged_by || '—'}</td>
-      <td><span class="pill ${pillClass(e.status)}">${titleCase(e.status)}</span></td>
-      ${isAdmin ? `<td><button class="del-btn" data-id="${e.error_id}" title="Delete">✕</button></td>` : ''}
+      <td>${money(e.cost)}</td>
+      <td>${escapeHtml(e.logged_by_name || e.logged_by || '—')}</td>
+      <td><span class="pill ${pillClass(e.status)}">${escapeHtml(titleCase(e.status))}</span></td>
+      ${isAdmin ? `<td><button class="del-btn" data-id="${escapeHtml(e.error_id)}" title="Delete">✕</button></td>` : ''}
     </tr>`).join('');
+
+  const allChecked = list.length && list.every(e => selected.has(e.error_id));
   body.innerHTML = `<table><thead><tr>
+    <th class="check-cell"><input type="checkbox" id="check-all"${allChecked ? ' checked' : ''} title="Select all" /></th>
     <th>ID</th><th>Type</th><th>Cause</th><th>Customer</th><th>Owner</th><th>Units</th><th>Cost</th><th>Logged by</th><th>Status</th>${isAdmin ? '<th></th>' : ''}
     </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-// Year selector — re-render on change (no reload needed; ALL_ERRORS is cached).
+function renderFilterChip(count) {
+  const wrap = document.getElementById('filter-chip-wrap');
+  if (statusFilter === 'all') { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<div class="filter-chip">Status: ${escapeHtml(titleCase(statusFilter))} (${count})
+    <button id="clear-filter" title="Clear filter" aria-label="Clear filter">×</button></div>`;
+}
+
+function renderBulkBar() {
+  const wrap = document.getElementById('bulk-bar-wrap');
+  if (!selected.size) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<div class="bulk-bar">
+    <span class="count">${selected.size} selected</span>
+    <label class="hint" for="bulk-status">Set status to</label>
+    <select id="bulk-status">${STATUSES.map(s => `<option value="${s}">${titleCase(s)}</option>`).join('')}</select>
+    <button class="btn-sm" id="bulk-apply">Apply</button>
+    <button class="btn-ghost" id="bulk-clear">Clear selection</button>
+    <span class="msg" id="bulk-msg"></span>
+  </div>`;
+}
+
+// Year selector — re-draw from cache (no refetch needed).
 document.getElementById('year-select').addEventListener('change', (e) => {
   selectedYear = e.target.value === 'all' ? 'all' : Number(e.target.value);
-  renderFromCache();
+  draw();
 });
 
 // Month metric toggle (Count / Cost).
@@ -561,26 +876,188 @@ document.getElementById('month-metric').addEventListener('click', (e) => {
   if (!btn) return;
   monthMetric = btn.dataset.metric;
   document.querySelectorAll('#month-metric .tog').forEach(b => b.classList.toggle('active', b === btn));
-  renderFromCache();
+  draw();
 });
 
-// Re-draw dashboard from cached ALL_ERRORS without re-fetching.
-function renderFromCache() {
-  const yearErrors = selectedYear === 'all'
-    ? ALL_ERRORS
-    : ALL_ERRORS.filter(e => errorYear(e) === Number(selectedYear));
-  document.getElementById('s-total').textContent = yearErrors.length;
-  document.getElementById('s-open').textContent = yearErrors.filter(e => e.status === 'open').length;
-  document.getElementById('s-resolved').textContent = yearErrors.filter(e => e.status === 'resolved').length;
-  const cost = yearErrors.reduce((s,e) => s + (Number(e.cost)||0), 0);
-  document.getElementById('s-cost').textContent = '$' + cost.toLocaleString(undefined,{maximumFractionDigits:0});
-  renderMonthChart(yearErrors);
-  const typeCounts = Object.fromEntries(ERROR_TYPES.map(t => [t, 0]));
-  const causeCounts = Object.fromEntries(ROOT_CAUSES.map(c => [c, 0]));
-  yearErrors.forEach(e => { if (typeCounts[e.error_type]!=null) typeCounts[e.error_type]++; if (causeCounts[e.root_cause]!=null) causeCounts[e.root_cause]++; });
-  renderBars('by-type', typeCounts);
-  renderBars('by-cause', causeCounts);
+// Vendor metric toggle (Count / Cost).
+document.getElementById('vendor-metric').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tog');
+  if (!btn) return;
+  vendorMetric = btn.dataset.metric;
+  document.querySelectorAll('#vendor-metric .tog').forEach(b => b.classList.toggle('active', b === btn));
+  draw();
+});
+
+// Dashboard tiles drill into the matching records.
+function drillTo(status) {
+  statusFilter = status;
+  document.getElementById('status-filter').value = status;
+  selected.clear();
+  draw();
+  showSection('records');
 }
+document.querySelectorAll('.stat.clickable').forEach(tile => {
+  tile.addEventListener('click', () => drillTo(tile.dataset.drill));
+  tile.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); drillTo(tile.dataset.drill); }
+  });
+});
+
+// Status filter on the Records tab.
+document.getElementById('status-filter').innerHTML =
+  '<option value="all">All statuses</option>' +
+  STATUSES.map(s => `<option value="${s}">${titleCase(s)}</option>`).join('');
+document.getElementById('status-filter').addEventListener('change', (e) => {
+  statusFilter = e.target.value;
+  selected.clear();
+  draw();
+});
+
+// Clear the filter chip.
+document.getElementById('filter-chip-wrap').addEventListener('click', (e) => {
+  if (!e.target.closest('#clear-filter')) return;
+  statusFilter = 'all';
+  document.getElementById('status-filter').value = 'all';
+  draw();
+});
+
+// ---- Selection + bulk status ----
+document.getElementById('records-body').addEventListener('change', (e) => {
+  if (e.target.id === 'check-all') {
+    const ids = [...document.querySelectorAll('.row-check')].map(c => c.dataset.id);
+    if (e.target.checked) ids.forEach(id => selected.add(id));
+    else ids.forEach(id => selected.delete(id));
+    renderRecords();
+    return;
+  }
+  const box = e.target.closest('.row-check');
+  if (!box) return;
+  if (box.checked) selected.add(box.dataset.id); else selected.delete(box.dataset.id);
+  renderRecords();
+});
+
+document.getElementById('bulk-bar-wrap').addEventListener('click', async (e) => {
+  if (e.target.closest('#bulk-clear')) { selected.clear(); renderRecords(); return; }
+  const apply = e.target.closest('#bulk-apply');
+  if (!apply) return;
+
+  const status = document.getElementById('bulk-status').value;
+  const ids = [...selected];
+  const msg = document.getElementById('bulk-msg');
+  if (!confirm(`Set ${ids.length} record${ids.length === 1 ? '' : 's'} to "${titleCase(status)}"?`)) return;
+
+  apply.disabled = true;
+  msg.textContent = 'Updating…';
+  msg.className = 'msg';
+  try {
+    const res = await patchErrorsBulk(ids, { status });
+    selected.clear();
+    await render();
+    if (res.missing && res.missing.length) {
+      alert(`Updated ${res.updated}. These were not found: ${res.missing.join(', ')}`);
+    }
+  } catch (err) {
+    msg.textContent = 'Error: ' + err.message;
+    msg.className = 'msg err';
+    if (apply) apply.disabled = false;
+  }
+});
+
+// ---- Record detail ----
+let currentRecord = null;
+
+fillSelect('d-type', ERROR_TYPES);
+fillSelect('d-cause', ROOT_CAUSES);
+fillSelect('d-status', STATUSES);
+const recomputeDetailCost = wireCost('d-units', 'd-unit-cost', 'd-cost-display');
+
+function openDetail(id) {
+  const rec = ALL_ERRORS.find(e => e.error_id === id);
+  if (!rec) return;
+  currentRecord = rec;
+  fillDetail(rec);
+  showSection('detail', 'records');
+}
+
+function fillDetail(rec) {
+  document.getElementById('detail-id').textContent = rec.error_id;
+  document.getElementById('detail-pill').innerHTML =
+    `<span class="pill ${pillClass(rec.status)}">${escapeHtml(titleCase(rec.status))}</span>`;
+  document.getElementById('d-status').value = rec.status || 'open';
+  document.getElementById('d-type').value = rec.error_type || ERROR_TYPES[0];
+  document.getElementById('d-cause').value = rec.root_cause || ROOT_CAUSES[0];
+  document.getElementById('d-invoice').value = rec.invoice_ref || '';
+  document.getElementById('d-owner').value = rec.owner || '';
+  document.getElementById('d-units').value = rec.units ?? '';
+  document.getElementById('d-unit-cost').value = unitCostOf(rec);
+  document.getElementById('d-description').value = rec.description || '';
+  recomputeDetailCost();
+  document.getElementById('detail-msg').textContent = '';
+
+  // Read-only provenance — these are set by the server, never edited here.
+  document.getElementById('detail-meta').innerHTML = [
+    ['Customer', rec.customer || '—'],
+    ['Customer ID', rec.customer_id || '—'],
+    ['Logged by', rec.logged_by_name || rec.logged_by || '—'],
+    ['Date logged', rec.date_logged ? new Date(rec.date_logged).toLocaleString() : '—'],
+    ['Date resolved', rec.date_resolved ? new Date(rec.date_resolved).toLocaleString() : '—'],
+  ].map(([k, v]) => `<div><div class="m-k">${k}</div><div class="m-v">${escapeHtml(v)}</div></div>`).join('');
+}
+
+// Row click opens the detail view — but not when the click was on a checkbox or
+// the delete button, which have their own behavior.
+document.getElementById('records-body').addEventListener('click', (e) => {
+  if (e.target.closest('.check-cell') || e.target.closest('.del-btn')) return;
+  const row = e.target.closest('.rec-row');
+  if (row) openDetail(row.dataset.id);
+});
+
+document.getElementById('detail-back').addEventListener('click', () => showSection('records'));
+document.getElementById('detail-reset').addEventListener('click', () => {
+  if (currentRecord) fillDetail(currentRecord);
+});
+
+document.getElementById('detail-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  if (!currentRecord) return;
+  const msg = document.getElementById('detail-msg');
+  const btn = ev.target.querySelector('button[type=submit]');
+
+  // Send only the editable fields; cost is derived server-side.
+  const patch = {
+    status: document.getElementById('d-status').value,
+    error_type: document.getElementById('d-type').value,
+    root_cause: document.getElementById('d-cause').value,
+    invoice_ref: document.getElementById('d-invoice').value.trim(),
+    owner: document.getElementById('d-owner').value.trim(),
+    units: document.getElementById('d-units').value,
+    unit_cost: document.getElementById('d-unit-cost').value,
+    description: document.getElementById('d-description').value.trim(),
+  };
+  // owner is optional; omit rather than sending "" (which the validator rejects
+  // for required fields and would otherwise blank a legitimate value).
+  if (!patch.owner) delete patch.owner;
+
+  btn.disabled = true;
+  msg.textContent = 'Saving…';
+  msg.className = 'msg';
+  try {
+    const updated = await patchError(currentRecord.error_id, patch);
+    currentRecord = updated;
+    await render();
+    // ALL_ERRORS was replaced by render(); re-point at the fresh object.
+    currentRecord = ALL_ERRORS.find(e => e.error_id === updated.error_id) || updated;
+    fillDetail(currentRecord);
+    msg.textContent = 'Saved';
+    msg.className = 'msg ok';
+    setTimeout(() => { msg.textContent = ''; }, 2500);
+  } catch (err) {
+    msg.textContent = 'Error: ' + err.message;
+    msg.className = 'msg err';
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 document.getElementById('error-form').addEventListener('submit', async (ev) => {
   ev.preventDefault();
@@ -596,21 +1073,45 @@ document.getElementById('error-form').addEventListener('submit', async (ev) => {
     return;
   }
 
+  const btn = ev.target.querySelector('button[type=submit]');
+  btn.disabled = true;
   try {
     const saved = await saveError(rec);
-    msg.textContent = `Logged ${saved.error_id}`;
-    msg.className = 'msg ok';
     ev.target.reset();
     document.getElementById('customer-search').value = '';
     document.getElementById('f-customer').value = '';
     updateVendorField();
+    recomputeLogCost();
     await render();
-    setTimeout(() => { msg.textContent = ''; }, 3000);
+
+    // Land back on the dashboard with the new record already reflected, and
+    // confirm there rather than on the now-empty form.
+    msg.textContent = '';
+    showSection('dash');
+    flashBanner(`Logged ${saved.error_id}`);
   } catch (e) {
     msg.textContent = 'Error: ' + e.message;
     msg.className = 'msg err';
+  } finally {
+    btn.disabled = false;
   }
 });
+
+// Transient confirmation shown on the dashboard after a redirect, since the
+// form's own message area is no longer on screen.
+function flashBanner(text) {
+  let el = document.getElementById('flash');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'flash';
+    el.className = 'flash';
+    document.getElementById('dash').prepend(el);
+  }
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(flashBanner._t);
+  flashBanner._t = setTimeout(() => el.classList.remove('show'), 4000);
+}
 
 // ---- User management (admin only) ----
 async function loadUsers() {
@@ -686,9 +1187,17 @@ document.getElementById('records-body').addEventListener('click', async (e) => {
   const id = btn.dataset.id;
   if (!confirm(`Delete error ${id}? This can't be undone.`)) return;
   try {
-    const r = await fetch('/api/intake?id=' + encodeURIComponent(id), { method: 'DELETE' });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) { alert(j.error || 'Delete failed'); return; }
+    if (LIVE) {
+      const r = await fetch('/api/intake?id=' + encodeURIComponent(id), { method: 'DELETE' });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { alert(j.error || 'Delete failed'); return; }
+    } else {
+      STORE = STORE.filter(x => x.error_id !== id);
+    }
+    // Drop it from the bulk selection too, or a deleted id would be sent in the
+    // next bulk update.
+    selected.delete(id);
+    if (currentRecord && currentRecord.error_id === id) currentRecord = null;
     await render();
   } catch (err) { alert('Delete failed: ' + err.message); }
 });
