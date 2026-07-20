@@ -11,7 +11,7 @@
 //   bootstrap POST { username, password, name } -> creates FIRST admin, only if no users exist
 
 import { setSessionCookie, clearSessionCookie, getSession } from "../lib/session.js";
-import { authenticate, createUser, noUsersYet, getUser } from "../lib/users.js";
+import { authenticate, createUser, noUsersYet, touchLastLogin } from "../lib/users.js";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -74,6 +74,7 @@ export default async function handler(req, res) {
     if (action === "login" || (body.username && body.password)) {
       const user = await authenticate(body.username, body.password);
       if (!user) return res.status(401).json({ error: "Invalid username or password" });
+      await touchLastLogin(user.username);
       setSessionCookie(res, { username: user.username, name: user.name, role: user.role });
       return res.status(200).json({ ok: true, user });
     }
