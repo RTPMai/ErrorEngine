@@ -171,6 +171,31 @@
   .del-btn[disabled], .btn-ghost[disabled] { opacity: .35; cursor: not-allowed; }
   .del-btn[disabled]:hover, .btn-ghost[disabled]:hover { background: none; border-color: var(--line); color: inherit; }
 
+  /* "X of Y vendor defects replaced" */
+  .replaced-stat { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .rs-bar { height: 8px; background: var(--bg); border-radius: 5px; overflow: hidden; margin-bottom: 8px; }
+  .rs-fill { height: 100%; background: var(--green); border-radius: 5px; transition: width .2s; }
+  .rs-text { font-size: 13px; color: var(--muted); }
+  .rs-text strong { color: var(--ink); font-size: 14px; }
+  .rs-pct { color: var(--green); font-weight: 700; margin-left: 6px; }
+
+  /* Toggle switch (Replaced?) */
+  .toggle-switch { display: flex; align-items: center; gap: 10px; height: 40px; }
+  .toggle-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .toggle-switch .switch {
+    position: relative; display: inline-block; width: 46px; height: 26px; flex: none;
+    background: var(--line); border-radius: 20px; cursor: pointer; transition: background .16s;
+  }
+  .toggle-switch .switch::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+    background: #fff; border-radius: 50%; transition: transform .16s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  .toggle-switch input:checked + .switch { background: var(--green); }
+  .toggle-switch input:checked + .switch::after { transform: translateX(20px); }
+  .toggle-switch input:focus-visible + .switch { outline: 2px solid var(--purple); outline-offset: 2px; }
+  .switch-text { font-size: 14px; font-weight: 600; color: var(--muted); }
+
   /* Post-submit confirmation on the dashboard */
   .flash { display: none; background: #E7F5EC; border: 1px solid var(--green); color: #256B41;
     padding: 12px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; margin-bottom: 18px; }
@@ -265,6 +290,7 @@
         </div>
       </div>
       <div id="by-vendor"></div>
+      <div id="replaced-stat"></div>
       <p class="hint" style="margin-top:12px">
         Vendor-attributed errors — root cause “vendor” or type “vendor defect”, grouped by the owner recorded on each error.
       </p>
@@ -299,6 +325,15 @@
         <div class="field" id="vendor-field" style="display:none">
           <label>Vendor <span class="req">*</span></label>
           <input name="owner" id="f-owner" placeholder="Vendor name (e.g. SanMar, S&S)" />
+        </div>
+        <div class="field" id="replaced-field" style="display:none">
+          <label>Replaced?</label>
+          <div class="toggle-switch">
+            <input type="checkbox" name="replaced" id="f-replaced" />
+            <label for="f-replaced" class="switch"></label>
+            <span class="switch-text" id="f-replaced-text">No</span>
+          </div>
+          <span class="hint">Did the vendor replace the goods?</span>
         </div>
         <div class="field">
           <label>Status <span class="req">*</span></label>
@@ -461,6 +496,15 @@
           <input id="d-cost-display" type="text" readonly tabindex="-1" class="computed" value="$0.00" />
           <span class="hint">Cost per unit × units</span>
         </div>
+        <div class="field" id="d-replaced-field" style="display:none">
+          <label>Replaced?</label>
+          <div class="toggle-switch">
+            <input type="checkbox" id="d-replaced" />
+            <label for="d-replaced" class="switch"></label>
+            <span class="switch-text" id="d-replaced-text">No</span>
+          </div>
+          <span class="hint">Did the vendor replace the goods?</span>
+        </div>
         <div class="field full">
           <label>What happened & why</label>
           <textarea name="description" id="d-description"></textarea>
@@ -620,16 +664,33 @@ function unitCostOf(e) {
 }
 
 // Owner field is vendor-only: show it (required) just for "vendor defect".
-// For all other error types the accountable AM/CSR comes from BackBone automatically.
+// The "Replaced?" toggle follows the same condition — it only means something for
+// a vendor defect, and applyDerived() drops the flag server-side if the type changes.
+const VENDOR_DEFECT = 'vendor defect';
+
 function updateVendorField() {
   const type = document.getElementById('f-type').value;
-  const isVendor = type === 'vendor defect';
+  const isVendor = type === VENDOR_DEFECT;
   const field = document.getElementById('vendor-field');
   const input = document.getElementById('f-owner');
   field.style.display = isVendor ? 'flex' : 'none';
   input.required = isVendor;
   if (!isVendor) input.value = ''; // don't submit a stale vendor name
+
+  const rf = document.getElementById('replaced-field');
+  const rc = document.getElementById('f-replaced');
+  rf.style.display = isVendor ? 'flex' : 'none';
+  if (!isVendor) rc.checked = false; // don't submit a stale flag
+  syncReplacedText('f-replaced', 'f-replaced-text');
 }
+
+// Keep the Yes/No caption in step with the switch.
+function syncReplacedText(boxId, textId) {
+  const box = document.getElementById(boxId);
+  const txt = document.getElementById(textId);
+  if (box && txt) txt.textContent = box.checked ? 'Yes' : 'No';
+}
+document.getElementById('f-replaced').addEventListener('change', () => syncReplacedText('f-replaced', 'f-replaced-text'));
 document.getElementById('f-type').addEventListener('change', updateVendorField);
 updateVendorField();
 
@@ -918,6 +979,29 @@ function renderDashboard(yearErrors) {
       ? (v => '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }))
       : undefined,
   });
+
+  renderReplacedStat(yearErrors);
+}
+
+// "X of Y vendor defects replaced" — counts only records whose error type is
+// "vendor defect". Records logged before this field existed have no flag at all;
+// they count toward Y but not X, and are called out separately so the ratio
+// isn't misread as a definite "not replaced".
+function renderReplacedStat(errors) {
+  const el = document.getElementById('replaced-stat');
+  const defects = errors.filter(e => e.error_type === VENDOR_DEFECT);
+  if (!defects.length) { el.innerHTML = ''; return; }
+
+  const replaced = defects.filter(e => e.replaced === true).length;
+  const unanswered = defects.filter(e => e.replaced !== true && e.replaced !== false).length;
+  const pct = Math.round((replaced / defects.length) * 100);
+
+  el.innerHTML = `<div class="replaced-stat">
+    <div class="rs-bar"><div class="rs-fill" style="width:${pct}%"></div></div>
+    <div class="rs-text"><strong>${replaced} of ${defects.length}</strong> vendor defect${defects.length === 1 ? '' : 's'} replaced
+      <span class="rs-pct">${pct}%</span></div>
+    ${unanswered ? `<div class="hint">${unanswered} not yet answered</div>` : ''}
+  </div>`;
 }
 
 // Records table. Honors the status filter (set directly, or by drilling in from a
@@ -1108,6 +1192,8 @@ function fillDetail(rec) {
   document.getElementById('d-units').value = rec.units ?? '';
   document.getElementById('d-unit-cost').value = unitCostOf(rec);
   document.getElementById('d-description').value = rec.description || '';
+  document.getElementById('d-replaced').checked = rec.replaced === true;
+  updateDetailReplacedField();
   recomputeDetailCost();
   document.getElementById('detail-msg').textContent = '';
 
@@ -1120,6 +1206,17 @@ function fillDetail(rec) {
     ['Date resolved', rec.date_resolved ? new Date(rec.date_resolved).toLocaleString() : '—'],
   ].map(([k, v]) => `<div><div class="m-k">${k}</div><div class="m-v">${escapeHtml(v)}</div></div>`).join('');
 }
+
+// Mirror the intake form: the toggle only appears while the record's type is a
+// vendor defect. Changing the type in the detail view shows/hides it live.
+function updateDetailReplacedField() {
+  const isVendor = document.getElementById('d-type').value === VENDOR_DEFECT;
+  document.getElementById('d-replaced-field').style.display = isVendor ? 'flex' : 'none';
+  if (!isVendor) document.getElementById('d-replaced').checked = false;
+  syncReplacedText('d-replaced', 'd-replaced-text');
+}
+document.getElementById('d-type').addEventListener('change', updateDetailReplacedField);
+document.getElementById('d-replaced').addEventListener('change', () => syncReplacedText('d-replaced', 'd-replaced-text'));
 
 // Row click opens the detail view — but not when the click was on a checkbox or
 // the delete button, which have their own behavior.
@@ -1151,6 +1248,11 @@ document.getElementById('detail-form').addEventListener('submit', async (ev) => 
     unit_cost: document.getElementById('d-unit-cost').value,
     description: document.getElementById('d-description').value.trim(),
   };
+  // Only send the flag when the (possibly just-changed) type is a vendor defect.
+  // applyDerived() also strips it server-side, so the two can't disagree.
+  if (patch.error_type === VENDOR_DEFECT) {
+    patch.replaced = document.getElementById('d-replaced').checked;
+  }
   // owner is optional; omit rather than sending "" (which the validator rejects
   // for required fields and would otherwise blank a legitimate value).
   if (!patch.owner) delete patch.owner;
@@ -1181,6 +1283,15 @@ document.getElementById('error-form').addEventListener('submit', async (ev) => {
   const fd = new FormData(ev.target);
   const rec = Object.fromEntries(fd.entries());
   const msg = document.getElementById('form-msg');
+
+  // An unchecked checkbox is omitted from FormData entirely, which would store
+  // nothing rather than an explicit false. For a vendor defect we always want a
+  // definite yes/no; for any other type we send nothing at all.
+  if (rec.error_type === VENDOR_DEFECT) {
+    rec.replaced = document.getElementById('f-replaced').checked;
+  } else {
+    delete rec.replaced;
+  }
 
   // Customer is a searchable combo (hidden input), so browser 'required' can't see it.
   if (!rec.customer_id) {
