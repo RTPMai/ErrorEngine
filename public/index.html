@@ -214,7 +214,6 @@
     <button class="tab active" data-tab="dash">Dashboard</button>
     <button class="tab" data-tab="log">Log an Error</button>
     <button class="tab" data-tab="records">Records</button>
-    <button class="tab" data-tab="lists" id="tab-lists" style="display:none">Manage Lists</button>
     <button class="tab" data-tab="settings" id="tab-settings" style="display:none">Settings</button>
   </div>
 
@@ -330,8 +329,10 @@
     </div>
   </section>
 
-  <!-- SETTINGS (admin only) -->
+  <!-- SETTINGS — user management (admin only) + list management (admin + management) -->
   <section id="settings" class="hidden">
+    <!-- Users: admin only. Hidden entirely for the management role. -->
+    <div id="settings-users" class="hidden">
     <div class="panel">
       <h2>Add a user</h2>
       <form id="user-form">
@@ -364,26 +365,10 @@
       <h2>Users</h2>
       <div id="users-body"><div class="empty">Loading…</div></div>
     </div>
-  </section>
+    </div><!-- /settings-users -->
 
-  <!-- RECORDS -->
-  <section id="records" class="hidden">
-    <div class="panel">
-      <div class="panel-head">
-        <h2 id="records-title">All Records</h2>
-        <div class="dash-controls" style="margin:0">
-          <label for="status-filter">Status</label>
-          <select id="status-filter"></select>
-        </div>
-      </div>
-      <div id="filter-chip-wrap"></div>
-      <div id="bulk-bar-wrap"></div>
-      <div id="records-body"><div class="empty">No records yet.</div></div>
-    </div>
-  </section>
-
-  <!-- LISTS (management + admin) -->
-  <section id="lists" class="hidden">
+    <!-- Lists: admin + management -->
+    <div id="settings-lists" class="hidden">
     <div class="panel">
       <h2>Manage Lists</h2>
       <p class="hint" style="margin-bottom:18px">
@@ -417,6 +402,23 @@
     <div class="panel">
       <h2 id="list-title">Options</h2>
       <div id="list-body"><div class="empty">Loading…</div></div>
+    </div>
+    </div><!-- /settings-lists -->
+  </section>
+
+  <!-- RECORDS -->
+  <section id="records" class="hidden">
+    <div class="panel">
+      <div class="panel-head">
+        <h2 id="records-title">All Records</h2>
+        <div class="dash-controls" style="margin:0">
+          <label for="status-filter">Status</label>
+          <select id="status-filter"></select>
+        </div>
+      </div>
+      <div id="filter-chip-wrap"></div>
+      <div id="bulk-bar-wrap"></div>
+      <div id="records-body"><div class="empty">No records yet.</div></div>
     </div>
   </section>
 
@@ -709,7 +711,7 @@ initCustomerCombo();
 
 // Tabs. 'detail' is a section without its own tab — it's reached by clicking a
 // record, and highlights the Records tab while it's open.
-const SECTIONS = ['dash','log','records','settings','lists','detail'];
+const SECTIONS = ['dash','log','records','settings','detail'];
 
 function showSection(name, tabName) {
   SECTIONS.forEach(s => {
@@ -1484,14 +1486,23 @@ async function ensureAuth() {
   refreshOptionSelects();
   updateVendorField();
 
-  // Settings (users) is admin-only. Manage Lists is admin + management.
-  if (user.role === 'admin') {
-    document.getElementById('tab-settings').style.display = '';
+  // Settings holds two stacked cards, each gated separately:
+  //   Users — admin only (adding users stays restricted)
+  //   Lists — admin + management
+  // The tab itself shows if either card is available to this role.
+  const canManageUsers = user.role === 'admin';
+  const canManageLists = CAN_EDIT_TAXONOMY || user.role === 'admin' || user.role === 'management';
+
+  if (canManageUsers) {
+    document.getElementById('settings-users').classList.remove('hidden');
     loadUsers();
   }
-  if (CAN_EDIT_TAXONOMY || user.role === 'admin' || user.role === 'management') {
-    document.getElementById('tab-lists').style.display = '';
+  if (canManageLists) {
+    document.getElementById('settings-lists').classList.remove('hidden');
     renderList();
+  }
+  if (canManageUsers || canManageLists) {
+    document.getElementById('tab-settings').style.display = '';
   }
 
   await loadCustomers();
