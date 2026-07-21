@@ -7,7 +7,7 @@
 // signature BackBone uses. Do NOT wrap the handler; call requireAuth inside it.
 
 import { requireAuth } from "../lib/session.js";
-import { validateRecordWith, validatePatchWith } from "../lib/schema.js";
+import { validateRecordWith, validatePatchWith, VENDOR_DEFECT } from "../lib/schema.js";
 import {
   listErrors, saveError, nextErrorId, resolveFromBackbone, deleteError,
   getError, updateError, bulkUpdateErrors,
@@ -109,6 +109,11 @@ export default async function handler(req, res) {
 
       const { ok, errors, record } = validateRecordWith(body, await activeValues());
       if (!ok) return res.status(400).json({ error: "Validation failed", details: errors });
+
+      // "Replaced?" only applies to vendor defects. applyDerived() enforces this on
+      // every update; do the same on create so a hand-crafted POST can't seed a flag
+      // that would skew the replacement stat.
+      if (record.error_type !== VENDOR_DEFECT) delete record.replaced;
 
       record.error_id = await nextErrorId();
       record.date_logged = new Date().toISOString();
