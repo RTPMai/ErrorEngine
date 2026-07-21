@@ -384,14 +384,10 @@
           <option value="status">Statuses</option>
         </select>
       </div>
-      <form id="list-add-form" style="grid-template-columns:2fr 2fr auto;align-items:end">
+      <form id="list-add-form" style="grid-template-columns:1fr auto;align-items:end">
         <div class="field">
           <label>New option <span class="req">*</span></label>
-          <input id="list-value" placeholder="e.g. embroidery defect" />
-        </div>
-        <div class="field">
-          <label>Display label</label>
-          <input id="list-label" placeholder="Optional — defaults to title case" />
+          <input id="list-value" placeholder="e.g. Embroidery Defect" />
         </div>
         <div class="actions" style="grid-column:auto">
           <button class="primary" type="submit">Add</button>
@@ -1270,8 +1266,7 @@ function renderList() {
     ].join(' ');
 
     return `<tr>
-      <td><strong>${escapeHtml(o.label)}</strong>${prot ? ' <span class="tag-sys">system</span>' : ''}
-          <div class="hint">${escapeHtml(o.value)}</div></td>
+      <td><strong>${escapeHtml(o.label)}</strong>${prot ? ' <span class="tag-sys">system</span>' : ''}</td>
       <td>${o.active ? '<span class="pill resolved">Active</span>' : '<span class="pill written">Retired</span>'}</td>
       <td>${n} record${n === 1 ? '' : 's'}</td>
       <td style="white-space:nowrap">${buttons}</td>
@@ -1317,15 +1312,15 @@ document.getElementById('list-select').addEventListener('change', (e) => {
 document.getElementById('list-add-form').addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const msg = document.getElementById('list-msg');
-  const value = document.getElementById('list-value').value.trim();
-  const label = document.getElementById('list-label').value.trim();
-  if (!value) { msg.textContent = 'Enter a value.'; msg.className = 'msg err'; return; }
+  const typed = document.getElementById('list-value').value.trim();
+  if (!typed) { msg.textContent = 'Enter an option name.'; msg.className = 'msg err'; return; }
+  // What you type is the display label. The stored value is derived from it
+  // (lowercased server-side) and isn't shown anywhere in the UI.
   try {
-    const j = await taxonomyRequest('POST', { field: currentList, value, label });
+    const j = await taxonomyRequest('POST', { field: currentList, value: typed, label: typed });
     document.getElementById('list-value').value = '';
-    document.getElementById('list-label').value = '';
     await afterTaxonomyChange();
-    msg.textContent = j.reactivated ? `Restored "${value}" (it was retired)` : `Added "${value}"`;
+    msg.textContent = j.reactivated ? `Restored "${typed}" (it was retired)` : `Added "${typed}"`;
     msg.className = 'msg ok';
     setTimeout(() => { msg.textContent = ''; }, 3500);
   } catch (e) {
@@ -1344,21 +1339,22 @@ document.getElementById('list-body').addEventListener('click', async (e) => {
 
   try {
     if (act === 'rename') {
-      const cur = (TAXONOMY[currentList].find(o => o.value === value) || {}).label || '';
-      const label = prompt(`Display label for "${value}":`, cur);
+      const cur = (TAXONOMY[currentList].find(o => o.value === value) || {}).label || value;
+      const label = prompt(`Rename "${cur}" to:`, cur);
       if (label == null || !label.trim()) return;
       await taxonomyRequest('PATCH', { field: currentList, value, action: 'rename', label: label.trim() });
     } else if (act === 'retire') {
       const n = usageOf(currentList, value);
+      const nm = labelFor(currentList, value);
       const warn = n > 0
         ? `\n\n${n} existing record${n === 1 ? '' : 's'} use this. They keep it and stay countable — it just won't be offered on new records.`
         : '';
-      if (!confirm(`Retire "${value}"?${warn}`)) return;
+      if (!confirm(`Retire "${nm}"?${warn}`)) return;
       await taxonomyRequest('PATCH', { field: currentList, value, action: 'retire' });
     } else if (act === 'restore') {
       await taxonomyRequest('PATCH', { field: currentList, value, action: 'restore' });
     } else if (act === 'delete') {
-      if (!confirm(`Permanently delete "${value}"? No records use it, so this is safe — but it can't be undone.`)) return;
+      if (!confirm(`Permanently delete "${labelFor(currentList, value)}"? No records use it, so this is safe — but it can't be undone.`)) return;
       await taxonomyRequest('DELETE', { field: currentList, value });
     }
     await afterTaxonomyChange();
