@@ -49,7 +49,7 @@
   .tab.active { color: var(--purple); border-bottom-color: var(--purple); }
 
   /* Cards */
-  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
   .stat {
     background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 18px 20px;
@@ -171,6 +171,25 @@
   .del-btn[disabled], .btn-ghost[disabled] { opacity: .35; cursor: not-allowed; }
   .del-btn[disabled]:hover, .btn-ghost[disabled]:hover { background: none; border-color: var(--line); color: inherit; }
 
+  .btn-ghost.on { border-color: var(--green); color: var(--green); background: #E7F5EC; }
+
+  /* Line items editor */
+  .line-row { display: grid; grid-template-columns: auto 1fr 90px 110px 90px 32px; gap: 8px;
+    align-items: center; margin-bottom: 8px; }
+  .line-row select, .line-row input { font-size: 13px; padding: 8px 10px; }
+  .line-row select.line-price { max-width: 170px; }
+  .line-sum { font-size: 13px; font-weight: 700; text-align: right; }
+  .line-actions { display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .line-total { font-size: 13px; color: var(--muted); }
+  .line-total strong { font-size: 17px; color: var(--ink); margin-left: 4px; }
+  .line-units { margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--line); }
+  @media (max-width: 720px) {
+    .line-row { grid-template-columns: 1fr 1fr; }
+    .line-row select.line-price { max-width: none; grid-column: 1 / -1; }
+    .line-row .line-label { grid-column: 1 / -1; }
+  }
+
   /* "X of Y vendor defects replaced" */
   .replaced-stat { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
   .rs-bar { height: 8px; background: var(--bg); border-radius: 5px; overflow: hidden; margin-bottom: 8px; }
@@ -261,6 +280,7 @@
         <div class="label">Resolved</div><div class="value green" id="s-resolved">0</div>
         <div class="drill">View records →</div>
       </div>
+      <div class="stat"><div class="label">Units Affected</div><div class="value" id="s-units">0</div></div>
       <div class="stat"><div class="label">Cost to Remake</div><div class="value" id="s-cost">$0</div></div>
     </div>
     <div class="panel">
@@ -339,18 +359,17 @@
           <label>Status <span class="req">*</span></label>
           <select name="status" required id="f-status"></select>
         </div>
-        <div class="field">
-          <label>Units Affected <span class="req">*</span></label>
-          <input name="units" id="f-units" type="number" min="0" required placeholder="0" />
-        </div>
-        <div class="field">
-          <label>Cost per Unit ($) <span class="req">*</span></label>
-          <input name="unit_cost" id="f-unit-cost" type="number" min="0" step="0.01" required placeholder="0.00" />
-        </div>
-        <div class="field">
-          <label>Total Cost</label>
-          <input id="f-cost-display" type="text" readonly tabindex="-1" class="computed" value="$0.00" />
-          <span class="hint">Cost per unit × units</span>
+        <div class="field full">
+          <label>Items affected <span class="req">*</span></label>
+          <p class="hint" style="margin:-2px 0 8px">
+            One incident, however many priced items it involves — add a line for each so it stays a single error.
+          </p>
+          <div id="f-lines"></div>
+          <div class="line-actions">
+            <button type="button" class="btn-ghost" id="f-add-line">+ Add line</button>
+            <span class="line-total">Total: <strong id="f-grand-total">$0.00</strong>
+              <span class="line-units" id="f-grand-units">0 units</span></span>
+          </div>
         </div>
         <div class="field full">
           <label>What happened & why <span class="req">*</span></label>
@@ -434,6 +453,29 @@
       <h2 id="list-title">Options</h2>
       <div id="list-body"><div class="empty">Loading…</div></div>
     </div>
+    <div class="panel">
+      <h2>Fusion Price List</h2>
+      <p class="hint" style="margin-bottom:18px">
+        Used by the cost dropdown when logging an error. Tick <strong>Price list</strong> on a root cause
+        below to have these offered for it. Prices are copied onto an error when it's logged, so editing
+        one here never changes the cost of an error already recorded.
+      </p>
+      <form id="price-add-form" style="grid-template-columns:1fr 140px auto;align-items:end">
+        <div class="field">
+          <label>Item <span class="req">*</span></label>
+          <input id="price-label" placeholder="e.g. 4x4" />
+        </div>
+        <div class="field">
+          <label>Cost per unit <span class="req">*</span></label>
+          <input id="price-cost" type="number" min="0" step="0.01" placeholder="0.00" />
+        </div>
+        <div class="actions" style="grid-column:auto">
+          <button class="primary" type="submit">Add</button>
+        </div>
+        <div class="actions"><span class="msg" id="price-msg"></span></div>
+      </form>
+      <div id="price-body" style="margin-top:18px"></div>
+    </div>
     </div><!-- /settings-lists -->
   </section>
 
@@ -483,18 +525,14 @@
           <label>Owner / Vendor</label>
           <input name="owner" id="d-owner" placeholder="—" />
         </div>
-        <div class="field">
-          <label>Units Affected</label>
-          <input name="units" id="d-units" type="number" min="0" />
-        </div>
-        <div class="field">
-          <label>Cost per Unit ($)</label>
-          <input name="unit_cost" id="d-unit-cost" type="number" min="0" step="0.01" />
-        </div>
-        <div class="field">
-          <label>Total Cost</label>
-          <input id="d-cost-display" type="text" readonly tabindex="-1" class="computed" value="$0.00" />
-          <span class="hint">Cost per unit × units</span>
+        <div class="field full">
+          <label>Items affected</label>
+          <div id="d-lines"></div>
+          <div class="line-actions">
+            <button type="button" class="btn-ghost" id="d-add-line">+ Add line</button>
+            <span class="line-total">Total: <strong id="d-grand-total">$0.00</strong>
+              <span class="line-units" id="d-grand-units">0 units</span></span>
+          </div>
         </div>
         <div class="field" id="d-replaced-field" style="display:none">
           <label>Replaced?</label>
@@ -567,6 +605,7 @@ async function loadTaxonomy() {
     // The server owns the protected list; mirror it so the UI disables the same
     // buttons the API would reject.
     if (j.protected) PROTECTED_VALUES = j.protected;
+    PRICES = j.prices || [];
   } catch (e) { /* keep seeds */ }
 }
 
@@ -640,21 +679,146 @@ function round2(n) { return Math.round((Number(n) + Number.EPSILON) * 100) / 100
 function money(n) {
   return '$' + round2(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-function computeCost(unitsEl, unitCostEl, displayEl) {
-  const u = Number(unitsEl.value), uc = Number(unitCostEl.value);
-  const valid = unitsEl.value !== '' && unitCostEl.value !== '' && !isNaN(u) && !isNaN(uc);
-  displayEl.value = valid ? money(uc * u) : '$0.00';
+// ---- Line items -------------------------------------------------------------
+// An error is one incident that may span several priced items (3 left front at
+// one price, 3 full back at another). Logging those as separate errors inflated
+// the error count and made the numbers unfair to whichever department was
+// involved, so they live as lines under a single record instead.
+//
+// Cost and units are BOTH derived from the lines and recomputed server-side.
+
+let PRICES = [];              // [{ id, label, unit_cost }] from /api/taxonomy
+let logLines = [];            // intake form working state
+let detailLines = [];         // detail view working state
+
+// A line the user is editing. `label` is free text; picking a price-list entry
+// fills both label and unit_cost, after which either can still be changed.
+function blankLine() { return { label: '', units: '', unit_cost: '' }; }
+
+// Does this record's root cause opt into the price dropdown?
+function rootCauseHasPrices(value) {
+  const o = (TAXONOMY.root_cause || []).find(x => x.value === value);
+  return !!(o && o.price_list);
 }
-function wireCost(unitsId, unitCostId, displayId) {
-  const u = document.getElementById(unitsId);
-  const uc = document.getElementById(unitCostId);
-  const d = document.getElementById(displayId);
-  const run = () => computeCost(u, uc, d);
-  u.addEventListener('input', run);
-  uc.addEventListener('input', run);
-  return run;
+
+function lineTotal(l) {
+  const u = Number(l.units), uc = Number(l.unit_cost);
+  return (isNaN(u) || isNaN(uc)) ? 0 : round2(u * uc);
 }
-const recomputeLogCost = wireCost('f-units', 'f-unit-cost', 'f-cost-display');
+function linesTotals(lines) {
+  return lines.reduce((acc, l) => {
+    acc.cost = round2(acc.cost + lineTotal(l));
+    acc.units += Number(l.units) || 0;
+    return acc;
+  }, { cost: 0, units: 0 });
+}
+
+// Render one line editor. `showPrices` adds the price-list dropdown.
+function renderLines(containerId, lines, showPrices, prefix) {
+  const el = document.getElementById(containerId);
+  if (!lines.length) {
+    el.innerHTML = '<div class="empty" style="padding:18px 0">No items yet — add a line.</div>';
+    return;
+  }
+  el.innerHTML = lines.map((l, i) => {
+    const priceSelect = showPrices ? `
+      <select class="line-price" data-i="${i}" title="Price list">
+        <option value="">Custom…</option>
+        ${PRICES.map(p => `<option value="${escapeHtml(p.id)}"${l.label === p.label ? ' selected' : ''}>${escapeHtml(p.label)} — ${money(p.unit_cost)}</option>`).join('')}
+      </select>` : '';
+    return `<div class="line-row">
+      ${priceSelect}
+      <input class="line-label" data-i="${i}" placeholder="Description" value="${escapeHtml(l.label)}" />
+      <input class="line-units" data-i="${i}" type="number" min="0" placeholder="Units" value="${escapeHtml(l.units)}" />
+      <input class="line-cost" data-i="${i}" type="number" min="0" step="0.01" placeholder="$ / unit" value="${escapeHtml(l.unit_cost)}" />
+      <span class="line-sum">${money(lineTotal(l))}</span>
+      <button type="button" class="del-btn line-del" data-i="${i}" title="Remove line"${lines.length === 1 ? ' disabled' : ''}>✕</button>
+    </div>`;
+  }).join('');
+}
+
+function refreshLineTotals(lines, totalId, unitsId) {
+  const t = linesTotals(lines);
+  document.getElementById(totalId).textContent = money(t.cost);
+  document.getElementById(unitsId).textContent = `${t.units} unit${t.units === 1 ? '' : 's'}`;
+}
+
+// Wire a line editor to its container. Handles edits, price picks, add and remove.
+function wireLines({ containerId, addBtnId, totalId, unitsId, get, set, causeSelectId }) {
+  const container = document.getElementById(containerId);
+
+  const redraw = () => {
+    renderLines(containerId, get(), rootCauseHasPrices(document.getElementById(causeSelectId).value), containerId);
+    refreshLineTotals(get(), totalId, unitsId);
+  };
+
+  container.addEventListener('input', (e) => {
+    const t = e.target;
+    const i = Number(t.dataset.i);
+    const lines = get();
+    if (isNaN(i) || !lines[i]) return;
+    if (t.classList.contains('line-label')) lines[i].label = t.value;
+    else if (t.classList.contains('line-units')) lines[i].units = t.value;
+    else if (t.classList.contains('line-cost')) lines[i].unit_cost = t.value;
+    else return;
+    // Update the running totals without a full redraw, so focus and caret stay put.
+    const row = t.closest('.line-row');
+    if (row) row.querySelector('.line-sum').textContent = money(lineTotal(lines[i]));
+    refreshLineTotals(lines, totalId, unitsId);
+  });
+
+  container.addEventListener('change', (e) => {
+    const sel = e.target.closest('.line-price');
+    if (!sel) return;
+    const i = Number(sel.dataset.i);
+    const lines = get();
+    if (!lines[i]) return;
+    const p = PRICES.find(x => x.id === sel.value);
+    if (p) {
+      // Copy the price onto the line. Editing the price list later never rewrites
+      // costs already recorded against an error.
+      lines[i].label = p.label;
+      lines[i].unit_cost = p.unit_cost;
+    }
+    redraw();
+  });
+
+  container.addEventListener('click', (e) => {
+    const del = e.target.closest('.line-del');
+    if (!del || del.disabled) return;
+    const lines = get();
+    lines.splice(Number(del.dataset.i), 1);
+    if (!lines.length) lines.push(blankLine());
+    set(lines);
+    redraw();
+  });
+
+  document.getElementById(addBtnId).addEventListener('click', () => {
+    get().push(blankLine());
+    redraw();
+  });
+
+  // Switching root cause can reveal or hide the price dropdown.
+  document.getElementById(causeSelectId).addEventListener('change', redraw);
+
+  return redraw;
+}
+
+// Older records predate lines — present their flat units/unit_cost as one line
+// so the editor has something to show and edits produce a normal lines array.
+function linesFromRecord(rec) {
+  if (Array.isArray(rec.lines) && rec.lines.length) {
+    return rec.lines.map(l => ({ label: l.label || '', units: l.units ?? '', unit_cost: l.unit_cost ?? '' }));
+  }
+  return [{ label: '', units: rec.units ?? '', unit_cost: unitCostOf(rec) || '' }];
+}
+
+// Strip blank rows and coerce to the API shape.
+function linesForApi(lines) {
+  return lines
+    .filter(l => String(l.units).trim() !== '' || String(l.unit_cost).trim() !== '')
+    .map(l => ({ label: String(l.label || '').trim(), units: Number(l.units) || 0, unit_cost: Number(l.unit_cost) || 0 }));
+}
 
 // Older records predate unit_cost — derive it so the detail view isn't blank.
 function unitCostOf(e) {
@@ -662,6 +826,15 @@ function unitCostOf(e) {
   const u = Number(e.units), c = Number(e.cost);
   return u > 0 && !isNaN(c) ? round2(c / u) : 0;
 }
+
+logLines = [blankLine()];
+const redrawLogLines = wireLines({
+  containerId: 'f-lines', addBtnId: 'f-add-line',
+  totalId: 'f-grand-total', unitsId: 'f-grand-units',
+  get: () => logLines, set: (v) => { logLines = v; },
+  causeSelectId: 'f-cause',
+});
+redrawLogLines(); // draw the first empty line
 
 // Owner field is vendor-only: show it (required) just for "vendor defect".
 // The "Replaced?" toggle follows the same condition — it only means something for
@@ -956,6 +1129,8 @@ function draw() {
 
 function renderDashboard(yearErrors) {
   const cost = yearErrors.reduce((s,e) => s + (Number(e.cost)||0), 0);
+  const units = yearErrors.reduce((s,e) => s + (Number(e.units)||0), 0);
+  document.getElementById('s-units').textContent = units.toLocaleString();
   document.getElementById('s-total').textContent = yearErrors.length;
   document.getElementById('s-open').textContent = yearErrors.filter(e => e.status === 'open').length;
   document.getElementById('s-resolved').textContent = yearErrors.filter(e => e.status === 'resolved').length;
@@ -1170,7 +1345,12 @@ document.getElementById('bulk-bar-wrap').addEventListener('click', async (e) => 
 // ---- Record detail ----
 let currentRecord = null;
 
-const recomputeDetailCost = wireCost('d-units', 'd-unit-cost', 'd-cost-display');
+const redrawDetailLines = wireLines({
+  containerId: 'd-lines', addBtnId: 'd-add-line',
+  totalId: 'd-grand-total', unitsId: 'd-grand-units',
+  get: () => detailLines, set: (v) => { detailLines = v; },
+  causeSelectId: 'd-cause',
+});
 
 function openDetail(id) {
   const rec = ALL_ERRORS.find(e => e.error_id === id);
@@ -1189,12 +1369,11 @@ function fillDetail(rec) {
   document.getElementById('d-cause').value = rec.root_cause || activeValues('root_cause')[0];
   document.getElementById('d-invoice').value = rec.invoice_ref || '';
   document.getElementById('d-owner').value = rec.owner || '';
-  document.getElementById('d-units').value = rec.units ?? '';
-  document.getElementById('d-unit-cost').value = unitCostOf(rec);
+  detailLines = linesFromRecord(rec);
   document.getElementById('d-description').value = rec.description || '';
   document.getElementById('d-replaced').checked = rec.replaced === true;
   updateDetailReplacedField();
-  recomputeDetailCost();
+  redrawDetailLines();
   document.getElementById('detail-msg').textContent = '';
 
   // Read-only provenance — these are set by the server, never edited here.
@@ -1244,8 +1423,7 @@ document.getElementById('detail-form').addEventListener('submit', async (ev) => 
     root_cause: document.getElementById('d-cause').value,
     invoice_ref: document.getElementById('d-invoice').value.trim(),
     owner: document.getElementById('d-owner').value.trim(),
-    units: document.getElementById('d-units').value,
-    unit_cost: document.getElementById('d-unit-cost').value,
+    lines: linesForApi(detailLines),
     description: document.getElementById('d-description').value.trim(),
   };
   // Only send the flag when the (possibly just-changed) type is a vendor defect.
@@ -1293,6 +1471,17 @@ document.getElementById('error-form').addEventListener('submit', async (ev) => {
     delete rec.replaced;
   }
 
+  // Lines replace the old flat units/unit_cost pair. The server recomputes cost
+  // and units from them, so we never send a total the user could have desynced.
+  rec.lines = linesForApi(logLines);
+  delete rec.units;
+  delete rec.unit_cost;
+  if (!rec.lines.length) {
+    msg.textContent = 'Add at least one item with units and a cost.';
+    msg.className = 'msg err';
+    return;
+  }
+
   // Customer is a searchable combo (hidden input), so browser 'required' can't see it.
   if (!rec.customer_id) {
     msg.textContent = 'Please select a customer from the list.';
@@ -1309,7 +1498,8 @@ document.getElementById('error-form').addEventListener('submit', async (ev) => {
     document.getElementById('customer-search').value = '';
     document.getElementById('f-customer').value = '';
     updateVendorField();
-    recomputeLogCost();
+    logLines = [blankLine()];
+    redrawLogLines();
     await render();
 
     // Land back on the dashboard with the new record already reflected, and
@@ -1373,6 +1563,10 @@ function renderList() {
         ? `<button class="btn-ghost act" data-act="retire" data-v="${escapeHtml(o.value)}"${canRetire ? '' : ' disabled'}>Retire</button>`
         : `<button class="btn-sm act" data-act="restore" data-v="${escapeHtml(o.value)}">Restore</button>`,
       `<button class="btn-ghost act" data-act="rename" data-v="${escapeHtml(o.value)}">Rename</button>`,
+      // Price-list opt-in is only meaningful on root causes today.
+      currentList === 'root_cause'
+        ? `<button class="btn-ghost act${o.price_list ? ' on' : ''}" data-act="price_list" data-v="${escapeHtml(o.value)}" title="Offer the fusion price list when this root cause is chosen">${o.price_list ? '✓ Price list' : 'Price list'}</button>`
+        : '',
       `<button class="del-btn act" data-act="delete" data-v="${escapeHtml(o.value)}"${canDelete ? '' : ' disabled'} title="${n > 0 ? 'In use — retire instead' : prot ? 'System option' : 'Delete'}">✕</button>`,
     ].join(' ');
 
@@ -1412,6 +1606,7 @@ async function afterTaxonomyChange() {
   await loadTaxonomy();
   refreshOptionSelects();
   renderList();
+  renderPrices();
   draw();
 }
 
@@ -1464,6 +1659,9 @@ document.getElementById('list-body').addEventListener('click', async (e) => {
       await taxonomyRequest('PATCH', { field: currentList, value, action: 'retire' });
     } else if (act === 'restore') {
       await taxonomyRequest('PATCH', { field: currentList, value, action: 'restore' });
+    } else if (act === 'price_list') {
+      const on = !(TAXONOMY[currentList].find(o => o.value === value) || {}).price_list;
+      await taxonomyRequest('PATCH', { field: currentList, value, action: 'price_list', on });
     } else if (act === 'delete') {
       if (!confirm(`Permanently delete "${labelFor(currentList, value)}"? No records use it, so this is safe — but it can't be undone.`)) return;
       await taxonomyRequest('DELETE', { field: currentList, value });
@@ -1473,6 +1671,73 @@ document.getElementById('list-body').addEventListener('click', async (e) => {
     msg.textContent = err.message;
     msg.className = 'msg err';
   }
+});
+
+// ---- Fusion price list ----
+function renderPrices() {
+  const body = document.getElementById('price-body');
+  if (!PRICES.length) { body.innerHTML = '<div class="empty">No prices yet.</div>'; return; }
+  body.innerHTML = `<table><thead><tr>
+    <th>Item</th><th>Cost per unit</th><th></th>
+    </tr></thead><tbody>${PRICES.map(p => `<tr>
+      <td><strong>${escapeHtml(p.label)}</strong></td>
+      <td>${money(p.unit_cost)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-ghost price-act" data-act="edit" data-id="${escapeHtml(p.id)}">Edit</button>
+        <button class="del-btn price-act" data-act="delete" data-id="${escapeHtml(p.id)}" title="Delete">✕</button>
+      </td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+async function priceRequest(method, payload) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  let url = '/api/taxonomy';
+  if (method === 'DELETE') url += `?kind=price&id=${encodeURIComponent(payload.id)}`;
+  else opts.body = JSON.stringify({ kind: 'price', ...payload });
+  const r = await fetch(url, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  PRICES = j.prices || PRICES;
+  return j;
+}
+
+document.getElementById('price-add-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const msg = document.getElementById('price-msg');
+  const label = document.getElementById('price-label').value.trim();
+  const cost = document.getElementById('price-cost').value;
+  if (!label || cost === '') { msg.textContent = 'Enter an item and a cost.'; msg.className = 'msg err'; return; }
+  try {
+    await priceRequest('POST', { label, unit_cost: cost });
+    document.getElementById('price-label').value = '';
+    document.getElementById('price-cost').value = '';
+    renderPrices();
+    msg.textContent = `Added "${label}"`;
+    msg.className = 'msg ok';
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+  } catch (e) { msg.textContent = e.message; msg.className = 'msg err'; }
+});
+
+document.getElementById('price-body').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.price-act');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const p = PRICES.find(x => x.id === id);
+  const msg = document.getElementById('price-msg');
+  msg.textContent = '';
+  try {
+    if (btn.dataset.act === 'edit') {
+      const label = prompt('Item name:', p ? p.label : '');
+      if (label == null) return;
+      const cost = prompt('Cost per unit:', p ? p.unit_cost : '');
+      if (cost == null) return;
+      await priceRequest('PATCH', { id, label: label.trim(), unit_cost: cost });
+    } else {
+      if (!confirm(`Delete "${p ? p.label : id}" from the price list?\n\nErrors already logged keep their recorded costs.`)) return;
+      await priceRequest('DELETE', { id });
+    }
+    renderPrices();
+  } catch (err) { msg.textContent = err.message; msg.className = 'msg err'; }
 });
 
 // ---- User management (admin only) ----
@@ -1592,6 +1857,7 @@ async function ensureAuth() {
   await loadTaxonomy();
   refreshOptionSelects();
   updateVendorField();
+  redrawLogLines(); // taxonomy now loaded — price dropdown reflects the real flags
 
   // Settings holds two stacked cards, each gated separately:
   //   Users — admin only (adding users stays restricted)
@@ -1607,6 +1873,7 @@ async function ensureAuth() {
   if (canManageLists) {
     document.getElementById('settings-lists').classList.remove('hidden');
     renderList();
+    renderPrices();
   }
   if (canManageUsers || canManageLists) {
     document.getElementById('tab-settings').style.display = '';
