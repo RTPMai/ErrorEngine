@@ -20,6 +20,7 @@
 import { requireAuth } from "../lib/session.js";
 import {
   getTaxonomy, addOption, setOptionActive, renameOption, deleteOption,
+  setOptionPriceList, getPrices, addPrice, updatePrice, deletePrice,
   LISTS, PROTECTED,
 } from "../lib/taxonomy-store.js";
 import { listErrors } from "../lib/data.js";
@@ -61,10 +62,11 @@ export default async function handler(req, res) {
     // READ is open to any signed-in user — the intake form can't render its
     // dropdowns without it.
     if (req.method === "GET") {
-      const [taxonomy, usage] = await Promise.all([getTaxonomy(), countUsage()]);
+      const [taxonomy, usage, prices] = await Promise.all([getTaxonomy(), countUsage(), getPrices()]);
       return res.status(200).json({
         taxonomy,
         usage,
+        prices,
         protected: PROTECTED,
         can_edit: CAN_EDIT.includes(sess.role),
       });
@@ -76,6 +78,32 @@ export default async function handler(req, res) {
     }
 
     const body = parseBody(req);
+
+    // ---- price list ----
+    // Routed on `kind: "price"` before the taxonomy `field` check, since price
+    // entries aren't tied to one of the three option lists.
+    const kind = body.kind || (req.query && req.query.kind);
+    if (kind === "price") {
+      if (req.method === "POST") {
+        const list = await addPrice({ label: body.label, unit_cost: body.unit_cost });
+        return res.status(201).json({ ok: true, prices: list });
+      }
+      if (req.method === "PATCH") {
+        if (!body.id) return res.status(400).json({ error: "Missing price id" });
+        const list = await updatePrice(body.id, { label: body.label, unit_cost: body.unit_cost });
+        return res.status(200).json({ ok: true, prices: list });
+      }
+      if (req.method === "DELETE") {
+        const id = (req.query && req.query.id) || body.id;
+        if (!id) return res.status(400).json({ error: "Missing price id" });
+        // Safe to delete outright: line items copy the cost at logging time rather
+        // than referencing the entry, so removing one never alters a saved error.
+        const list = await deletePrice(id);
+        return res.status(200).json({ ok: true, prices: list });
+      }
+      return res.status(400).json({ error: "Unsupported price operation" });
+    }
+
     const field = body.field || (req.query && req.query.field);
     if (!LISTS.includes(field)) {
       return res.status(400).json({ error: `field must be one of: ${LISTS.join(", ")}` });
@@ -99,7 +127,11 @@ export default async function handler(req, res) {
         const list = await setOptionActive(field, value, body.action === "restore");
         return res.status(200).json({ ok: true, field, list });
       }
-      return res.status(400).json({ error: 'action must be "retire", "restore", or "rename"' });
+      if (body.action === "price_list") {
+        const list = await setOptionPriceList(field, value, !!body.on);
+        return res.status(200).json({ ok: true, field, list });
+      }
+      return res.status(400).json({ error: 'action must be "retire", "restore", "rename", or "price_list"' });
     }
 
     if (req.method === "DELETE") {
